@@ -1,0 +1,23 @@
+{
+  "name": "menfessin-aja",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Menfessin Aja - Platform Komunitas Anonim, Marketplace C2C, dan Lost & Found",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:server": "npm run dev --workspace=@menfessin-aja/server",
+    "dev:web": "npm run dev --workspace=@menfessin-aja/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:shared": "npm run build --workspace=@menfessin-aja/shared",
+    "build:server": "npm run build --workspace=@menfessin-aja/server",
+    "build:web": "npm run build --workspace=@menfessin-aja/web",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
