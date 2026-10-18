@@ -10,12 +10,13 @@ const authStore = useAuthStore();
 const email = ref('');
 const password = ref('');
 const confirmPassword = ref('');
-const turnstileVerified = ref(false);
-const isLoading = ref(false);
+const turnstileToken = ref('demo-turnstile-token');
+const turnstileVerified = ref(true);
 const errorMessage = ref('');
 
 function handleTurnstileSimulate() {
   turnstileVerified.value = true;
+  turnstileToken.value = 'demo-turnstile-token';
 }
 
 async function handleRegister() {
@@ -27,30 +28,18 @@ async function handleRegister() {
     errorMessage.value = 'Konfirmasi kata sandi tidak cocok';
     return;
   }
-  if (!turnstileVerified.value) {
+  if (!turnstileVerified.value || !turnstileToken.value) {
     errorMessage.value = 'Silakan selesaikan tantangan verifikasi anti-bot';
     return;
   }
 
-  isLoading.value = true;
   errorMessage.value = '';
 
   try {
-    authStore.setAuth(
-      {
-        id: '00000000-0000-0000-0000-000000000002',
-        email: email.value,
-        role: 'member',
-        status: 'active',
-        created_at: new Date().toISOString()
-      },
-      'demo-jwt-token-sprint-0'
-    );
+    await authStore.register(email.value, password.value, turnstileToken.value);
     router.push('/');
   } catch (err: any) {
     errorMessage.value = err.message || 'Pendaftaran gagal';
-  } finally {
-    isLoading.value = false;
   }
 }
 </script>
@@ -144,10 +133,10 @@ async function handleRegister() {
         <!-- Submit Button -->
         <button 
           type="submit"
-          :disabled="isLoading"
+          :disabled="authStore.isLoading"
           class="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold shadow-sm transition-all active:scale-[0.98] disabled:opacity-50"
         >
-          <span v-if="isLoading">Mendaftarkan...</span>
+          <span v-if="authStore.isLoading">Mendaftarkan...</span>
           <span v-else>Buat Akun Sekarang</span>
         </button>
       </form>

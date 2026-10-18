@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 
 import AdminDashboardView from '../views/AdminDashboardView.vue';
 import LoginView from '../views/LoginView.vue';
@@ -32,19 +33,19 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
-      meta: { title: 'Masuk Akun' }
+      meta: { title: 'Masuk Akun', guestOnly: true }
     },
     {
       path: '/register',
       name: 'register',
       component: RegisterView,
-      meta: { title: 'Daftar Akun' }
+      meta: { title: 'Daftar Akun', guestOnly: true }
     },
     {
       path: '/admin',
       name: 'admin',
       component: AdminDashboardView,
-      meta: { title: 'Dasbor Moderasi Admin' }
+      meta: { title: 'Dasbor Moderasi Admin', requiresAdmin: true }
     }
   ],
   scrollBehavior() {
@@ -56,6 +57,24 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.title) {
     document.title = `${to.meta.title} - Menfessin Aja`;
   }
+
+  const authStore = useAuthStore();
+
+  // Guard halaman khusus Admin
+  if (to.meta.requiresAdmin) {
+    if (!authStore.isAuthenticated) {
+      return next({ path: '/login', query: { redirect: to.fullPath } });
+    }
+    if (!authStore.isAdmin) {
+      return next({ path: '/' });
+    }
+  }
+
+  // Guard halaman khusus Tamu / Guest (Login / Register)
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    return next({ path: '/' });
+  }
+
   next();
 });
 

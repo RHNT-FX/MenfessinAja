@@ -1,15 +1,12 @@
 import { Hono } from 'hono';
+import { AuthController } from '../controllers/auth.controller.js';
+import { requireAuth } from '../middlewares/auth.middleware.js';
 
 export const authRouter = new Hono();
 
-authRouter.post('/register', (c) => {
-  return c.json({ message: 'Auth register endpoint siap untuk Sprint 1' });
-});
+// Publik
+authRouter.post('/register', AuthController.register);
+authRouter.post('/login', AuthController.login);
 
-authRouter.post('/login', (c) => {
-  return c.json({ message: 'Auth login endpoint siap untuk Sprint 1' });
-});
-
-authRouter.get('/me', (c) => {
-  return c.json({ message: 'Auth session profile endpoint siap untuk Sprint 1' });
-});
+// Terproteksi dengan JWT
+authRouter.get('/me', requireAuth, AuthController.me);

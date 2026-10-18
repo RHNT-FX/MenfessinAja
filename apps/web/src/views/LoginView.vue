@@ -7,15 +7,15 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 const authStore = useAuthStore();
 
-const email = ref('');
-const password = ref('');
-const turnstileVerified = ref(false);
-const isLoading = ref(false);
+const email = ref('student@menfessinaja.ac.id');
+const password = ref('password123');
+const turnstileToken = ref('demo-turnstile-token');
+const turnstileVerified = ref(true);
 const errorMessage = ref('');
 
 function handleTurnstileSimulate() {
-  // Simulasi verifikasi human-check Turnstile untuk tahap Sprint 0
   turnstileVerified.value = true;
+  turnstileToken.value = 'demo-turnstile-token';
 }
 
 async function handleLogin() {
@@ -23,32 +23,22 @@ async function handleLogin() {
     errorMessage.value = 'Silakan lengkapi email dan kata sandi';
     return;
   }
-  if (!turnstileVerified.value) {
+  if (!turnstileVerified.value || !turnstileToken.value) {
     errorMessage.value = 'Silakan selesaikan tantangan verifikasi anti-bot';
     return;
   }
 
-  isLoading.value = true;
   errorMessage.value = '';
 
   try {
-    // Sprint 0 default mock login (akan dihubungkan ke API di Sprint 1)
-    const isAdmin = email.value.includes('admin');
-    authStore.setAuth(
-      {
-        id: '00000000-0000-0000-0000-000000000001',
-        email: email.value,
-        role: isAdmin ? 'admin' : 'member',
-        status: 'active',
-        created_at: new Date().toISOString()
-      },
-      'demo-jwt-token-sprint-0'
-    );
-    router.push(isAdmin ? '/admin' : '/');
+    const user = await authStore.login(email.value, password.value, turnstileToken.value);
+    if (user.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/');
+    }
   } catch (err: any) {
     errorMessage.value = err.message || 'Login gagal';
-  } finally {
-    isLoading.value = false;
   }
 }
 </script>
@@ -64,6 +54,27 @@ async function handleLogin() {
       <div class="mb-6 text-center">
         <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Masuk Akun</h1>
         <p class="text-xs sm:text-sm text-slate-500 mt-1">Gunakan akun civitas kampus untuk memposting</p>
+      </div>
+
+      <!-- Quick Demo Credentials Hint -->
+      <div class="mb-5 p-3 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 space-y-1">
+        <p class="font-bold">Akun Demo Cepat:</p>
+        <div class="flex flex-wrap gap-2 text-[11px]">
+          <button 
+            type="button"
+            @click="email = 'student@menfessinaja.ac.id'; password = 'password123'"
+            class="px-2 py-0.5 rounded-md bg-white border border-blue-300 font-medium hover:bg-blue-100/50"
+          >
+            Member: student@...
+          </button>
+          <button 
+            type="button"
+            @click="email = 'admin@menfessinaja.ac.id'; password = 'password123'"
+            class="px-2 py-0.5 rounded-md bg-white border border-blue-300 font-medium hover:bg-blue-100/50"
+          >
+            Admin: admin@...
+          </button>
+        </div>
       </div>
 
       <div v-if="errorMessage" class="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-xs font-medium border border-red-200">
@@ -127,10 +138,10 @@ async function handleLogin() {
         <!-- Submit Button -->
         <button 
           type="submit"
-          :disabled="isLoading"
+          :disabled="authStore.isLoading"
           class="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold shadow-sm transition-all active:scale-[0.98] disabled:opacity-50"
         >
-          <span v-if="isLoading">Memproses...</span>
+          <span v-if="authStore.isLoading">Memproses...</span>
           <span v-else>Masuk ke Aplikasi</span>
         </button>
       </form>
