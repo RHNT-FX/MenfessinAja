@@ -18,7 +18,7 @@
   <b>NIM: 11241059</b>
 </p>
 
-[📌 Desain Figma](https://www.figma.com/design/uwSek0zjHuelJrbXUqpmgl/Untitled?node-id=0-1&m=dev&t=FJs5Xu6yQ1uWd1qr-1) • [📺 Video Demo Progres (YouTube)](https://www.youtube.com/watch?v=OjuVE2ToeIY) • [📄 Dokumen SRS & SDD](./)
+[📌 Desain Figma](https://www.figma.com/design/uwSek0zjHuelJrbXUqpmgl/Untitled?node-id=0-1&m=dev&t=FJs5Xu6yQ1uWd1qr-1) • [📺 Video Demo Progres (YouTube)](https://www.youtube.com/@kingkalikongs) • [📄 Dokumen SRS & SDD](https://drive.google.com/drive/folders/1vHwuHLuNVIFWCbe5xRfjifN-F9aE-fM6?usp=sharing)
 
 ---
 
