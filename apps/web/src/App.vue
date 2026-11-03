@@ -23,7 +23,7 @@ onMounted(() => {
     <!-- Footer (Sesuai Figma) -->
     <footer class="border-t border-border bg-canvas py-8 text-xs text-ink-muted">
       <div class="max-w-[1360px] mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p class="font-medium">GUEH / Menfessin aja. © 2026</p>
+        <p class="font-medium">Menfessin Aja. © 2026</p>
         <div class="flex items-center gap-4 text-ink-muted">
           <a href="#privasi" class="hover:text-ink transition-colors">Privasi</a>
           <span>/</span>

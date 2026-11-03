@@ -315,7 +315,7 @@ function formatRupiah(num: number) {
 
             <!-- WhatsApp Chat Button (Sesuai Figma) -->
             <a
-              :href="`https://wa.me/${selectedProduct.sellerWa}?text=Halo,%20saya%20tertarik%20dengan%20barang%20'${encodeURIComponent(selectedProduct.title)}'%20di%20GUEH%20Menfessin%20Aja.`"
+              :href="`https://wa.me/${selectedProduct.sellerWa}?text=Halo,%20saya%20tertarik%20dengan%20barang%20'${encodeURIComponent(selectedProduct.title)}'%20di%20Menfessin%20Aja.`"
               target="_blank"
               rel="noopener noreferrer"
               class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold py-3 px-4 rounded-sm flex items-center justify-center gap-2 shadow-xs transition-all mb-4"
@@ -327,7 +327,7 @@ function formatRupiah(num: number) {
             <!-- Sepakati Langsung Box (Sesuai Figma) -->
             <div class="p-3.5 bg-primary-soft text-xs text-ink leading-relaxed rounded-xs mb-4">
               <span class="font-bold text-primary block mb-0.5">Sepakati langsung dengan penjual.</span>
-              Pembayaran barang dan ambil barang diatur lewat WhatsApp. GUEH tidak menyediakan checkout, escrow, atau pengiriman. Pilih tempat temu yang aman.
+              Pembayaran barang dan ambil barang diatur lewat WhatsApp. Menfessin Aja tidak menyediakan checkout, escrow, atau pengiriman. Pilih tempat temu yang aman.
             </div>
 
             <button class="text-xs text-ink-muted hover:text-ink flex items-center gap-1.5 transition-colors">

@@ -224,7 +224,7 @@ async function handleRegister() {
             :disabled="authStore.isLoading"
             class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs"
           >
-            <span>Masuk ke GUEH</span>
+            <span>Masuk ke Akun</span>
             <ArrowRight class="w-3.5 h-3.5" />
           </button>
 
@@ -317,7 +317,7 @@ async function handleRegister() {
           <!-- Terms Checkbox -->
           <label class="flex items-start gap-2 cursor-pointer text-xs text-ink leading-snug select-none pt-1">
             <input v-model="agreePolicy" type="checkbox" class="accent-primary mt-0.5" />
-            <span>Saya setuju dengan Pedoman Komunitas dan Kebijakan Privasi GUEH.</span>
+            <span>Saya setuju dengan Pedoman Komunitas dan Kebijakan Privasi Menfessin Aja.</span>
           </label>
 
           <!-- Turnstile Placeholder -->

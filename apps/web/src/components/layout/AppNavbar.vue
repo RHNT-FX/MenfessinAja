@@ -18,16 +18,15 @@ function handleLogout() {
 <template>
   <header class="w-full bg-canvas border-b border-border sticky top-0 z-40">
     <div class="max-w-[1360px] mx-auto px-4 sm:px-8 h-20 flex items-center justify-between gap-6">
-      <!-- Logo & Brand Header (Sesuai Figma) -->
+      <!-- Logo & Brand Header -->
       <div class="flex items-center gap-4">
-        <router-link to="/" class="flex items-baseline gap-3 group">
-          <span class="font-black text-3xl sm:text-4xl tracking-tighter text-ink select-none">
-            GUEH.
+        <router-link to="/" class="flex flex-col text-left group">
+          <span class="font-black text-2xl sm:text-3xl tracking-tighter text-ink select-none group-hover:text-primary transition-colors">
+            Menfessin Aja.
           </span>
-          <div class="hidden sm:flex flex-col text-left">
-            <span class="text-xs font-bold text-ink leading-tight">Menfessin aja.</span>
-            <span class="text-[11px] text-ink-muted leading-tight">Papan cerita & kabar kampus</span>
-          </div>
+          <span class="text-[11px] text-ink-muted leading-tight hidden sm:block">
+            Papan cerita & kabar kampus
+          </span>
         </router-link>
       </div>
 
