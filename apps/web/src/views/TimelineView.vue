@@ -1,136 +1,262 @@
 <script setup lang="ts">
 import AppSidebar from '@/components/layout/AppSidebar.vue';
+import { useAuthStore } from '@/stores/auth';
+import { apiFetch } from '@/utils/api';
+import type { Comment } from '@menfessin-aja/shared';
 import {
+  AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
   Image as ImageIcon,
+  Loader2,
   MessageSquare,
   QrCode,
+  Send,
   ShieldCheck,
   Sparkles,
   X
 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
-// Modal state
-const isCreateOpen = ref(false);
+interface FeedPost {
+  id: string;
+  user_id: string;
+  kategori: string;
+  teks_konten: string;
+  media_url?: string | null;
+  ai_score: number;
+  status: string;
+  is_boosted: boolean;
+  upvotes_count: number;
+  comments_count: number;
+  user_vote?: 'up' | 'down' | null;
+  extra_meta?: {
+    category_pill?: string;
+    is_superchat?: boolean;
+    [key: string]: unknown;
+  };
+  created_at: string;
+}
+
+const router = useRouter();
+const authStore = useAuthStore();
+
+// Feed state
+const posts = ref<FeedPost[]>([]);
+const isLoading = ref(false);
+const errorMsg = ref('');
 const activeTab = ref<'terbaru' | 'populer'>('terbaru');
 const selectedTopic = ref('Semua cerita');
 
-// Compose form state
-const kategori = ref('Info kampus');
+// Compose modal state
+const isCreateOpen = ref(false);
+const kategori = ref('Curhat');
 const teksKonten = ref('');
-const isSuperchatSelected = ref(true);
-const composeSubmitted = ref(false);
+const isSuperchatSelected = ref(false);
+const isSubmitting = ref(false);
+const composeResult = ref<{ success: boolean; flagged?: boolean; message: string } | null>(null);
 
-const demoPosts = ref([
-  {
-    id: 'post-superchat-1',
-    is_boosted: true,
-    tag: '#info kampus',
-    time: '1 jam lalu',
-    author: 'Anonim',
-    text: 'Punya buku yang udah selesai dibaca? Minggu ini kita tukeran buku di taman kampus. Bawa satu, pulang bawa cerita baru. Jumat, jam 15.30!',
-    upvotes: 94,
-    comments_count: 16,
-    hasVoted: false
-  },
-  {
-    id: 'post-1',
-    is_boosted: false,
-    tag: '#curhat',
-    time: '8 menit lalu',
-    author: 'Anonim',
-    text: 'Ada yang ngerasa semester ini capeknya beda? Bukan tugasnya doang, tapi harus keliatan baik-baik aja terus. Pengen tahu kalian biasanya reset kepala gimana.',
-    upvotes: 128,
-    comments_count: 24,
-    hasVoted: false
-  },
-  {
-    id: 'post-2',
-    is_boosted: false,
-    tag: '#tanya',
-    time: '19 menit lalu',
-    author: 'Anonim',
-    text: 'Tempat ngeprint yang masih buka jam 9 malam di sekitar kampus di mana ya? Besok pagi dikumpul, printer kos memilih menyerah 😭',
-    upvotes: 42,
-    comments_count: 11,
-    hasVoted: false
-  },
-  {
-    id: 'post-3',
-    is_boosted: false,
-    tag: '#apresiasi',
-    time: '32 menit lalu',
-    author: 'Anonim',
-    text: 'Buat yang tadi minjemin payung di depan perpus: makasih. Gak tahu siapa kamu, tapi semoga revisimu dikit.',
-    upvotes: 86,
-    comments_count: 7,
-    hasVoted: false
-  },
-  {
-    id: 'post-4',
-    is_boosted: false,
-    tag: '#akademik',
-    time: '47 menit lalu',
-    author: 'Anonim',
-    text: 'Nyari teman belajar statistik dari nol. Beneran nol, bukan “aku belum belajar” terus nilainya 98. Ada yang mau bareng?',
-    upvotes: 63,
-    comments_count: 18,
-    hasVoted: false
-  }
-]);
+// Comments modal / drawer state
+const isCommentsOpen = ref(false);
+const activeCommentPost = ref<FeedPost | null>(null);
+const postComments = ref<Comment[]>([]);
+const isLoadingComments = ref(false);
+const newCommentText = ref('');
+const isSubmittingComment = ref(false);
 
-function handleVote(post: any, direction: 'up' | 'down') {
-  if (direction === 'up') {
-    post.upvotes++;
-  } else if (post.upvotes > 0) {
-    post.upvotes--;
+onMounted(() => {
+  loadPosts();
+});
+
+async function loadPosts() {
+  isLoading.value = true;
+  errorMsg.value = '';
+  try {
+    const res = await apiFetch('/api/posts', {
+      params: { kategori: 'menfess' }
+    });
+    if (res.success && res.data?.items) {
+      posts.value = res.data.items;
+    }
+  } catch (err: any) {
+    errorMsg.value = err.message || 'Gagal memuat postingan linimasa';
+  } finally {
+    isLoading.value = false;
   }
 }
+
+// Filtered and sorted posts
+const displayedPosts = computed(() => {
+  let list = [...posts.value];
+
+  // Topic filter
+  if (selectedTopic.value && selectedTopic.value !== 'Semua cerita') {
+    list = list.filter((p) => {
+      const pill = p.extra_meta?.category_pill?.toLowerCase() || '';
+      return pill.includes(selectedTopic.value.toLowerCase());
+    });
+  }
+
+  // Tab sort
+  if (activeTab.value === 'populer') {
+    list.sort((a, b) => {
+      if (a.is_boosted && !b.is_boosted) return -1;
+      if (!a.is_boosted && b.is_boosted) return 1;
+      return (b.upvotes_count || 0) - (a.upvotes_count || 0);
+    });
+  } else {
+    list.sort((a, b) => {
+      if (a.is_boosted && !b.is_boosted) return -1;
+      if (!a.is_boosted && b.is_boosted) return 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }
+
+  return list;
+});
 
 function handleFilterTopic(topic: string) {
   selectedTopic.value = topic;
 }
 
 function handleOpenCreate() {
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
   isCreateOpen.value = true;
-  composeSubmitted.value = false;
+  composeResult.value = null;
 }
 
-function handleSubmitPost() {
-  if (!teksKonten.value.trim()) return;
-
-  const newPost = {
-    id: `post-${Date.now()}`,
-    is_boosted: isSuperchatSelected.value,
-    tag: `#${kategori.value.toLowerCase().replace(/\s+/g, '')}`,
-    time: 'Baru saja',
-    author: 'Anonim',
-    text: teksKonten.value,
-    upvotes: 1,
-    comments_count: 0,
-    hasVoted: true
-  };
-
-  if (newPost.is_boosted) {
-    demoPosts.value.unshift(newPost);
-  } else {
-    // Sisipkan setelah postingan superchat pertama
-    const pinnedIdx = demoPosts.value.findIndex(p => !p.is_boosted);
-    if (pinnedIdx !== -1) {
-      demoPosts.value.splice(pinnedIdx, 0, newPost);
-    } else {
-      demoPosts.value.unshift(newPost);
-    }
+async function handleVote(post: FeedPost, direction: 'up' | 'down') {
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
   }
 
-  composeSubmitted.value = true;
-  setTimeout(() => {
-    isCreateOpen.value = false;
-    teksKonten.value = '';
-    composeSubmitted.value = false;
-  }, 1200);
+  try {
+    const res = await apiFetch(`/api/posts/${post.id}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ type: direction })
+    });
+    if (res.success && res.data) {
+      post.upvotes_count = res.data.upvotes_count;
+      post.user_vote = res.data.user_vote;
+    }
+  } catch (err: any) {
+    console.error('Vote gagal:', err);
+  }
+}
+
+async function handleSubmitPost() {
+  if (!teksKonten.value.trim() || isSubmitting.value) return;
+
+  isSubmitting.value = true;
+  composeResult.value = null;
+
+  try {
+    const res = await apiFetch('/api/posts/menfess', {
+      method: 'POST',
+      body: JSON.stringify({
+        teks_konten: teksKonten.value,
+        category_pill: kategori.value,
+        is_superchat: isSuperchatSelected.value
+      })
+    });
+
+    if (res.flagged) {
+      composeResult.value = {
+        success: true,
+        flagged: true,
+        message: 'Konten Anda memerlukan peninjauan oleh tim moderasi dan telah masuk antrean admin.'
+      };
+    } else {
+      composeResult.value = {
+        success: true,
+        flagged: false,
+        message: 'Menfess berhasil dikirim dan ditayangkan!'
+      };
+      if (res.data) {
+        posts.value.unshift({
+          ...res.data,
+          comments_count: 0
+        });
+      }
+    }
+
+    setTimeout(() => {
+      isCreateOpen.value = false;
+      teksKonten.value = '';
+      composeResult.value = null;
+    }, 1800);
+  } catch (err: any) {
+    composeResult.value = {
+      success: false,
+      message: err.message || 'Gagal mengirim menfess'
+    };
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+// Comments handler
+async function openComments(post: FeedPost) {
+  activeCommentPost.value = post;
+  isCommentsOpen.value = true;
+  postComments.value = [];
+  newCommentText.value = '';
+  isLoadingComments.value = true;
+
+  try {
+    const res = await apiFetch(`/api/posts/${post.id}/comments`);
+    if (res.success && res.data) {
+      postComments.value = res.data;
+    }
+  } catch (err) {
+    console.error('Gagal memuat komentar:', err);
+  } finally {
+    isLoadingComments.value = false;
+  }
+}
+
+async function submitComment() {
+  if (!newCommentText.value.trim() || !activeCommentPost.value || isSubmittingComment.value) return;
+
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+
+  isSubmittingComment.value = true;
+  try {
+    const res = await apiFetch(`/api/posts/${activeCommentPost.value.id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        isi_komentar: newCommentText.value
+      })
+    });
+
+    if (res.success && res.data) {
+      postComments.value.push(res.data);
+      activeCommentPost.value.comments_count = (activeCommentPost.value.comments_count || 0) + 1;
+      newCommentText.value = '';
+    }
+  } catch (err: any) {
+    alert(err.message || 'Gagal mengirim komentar');
+  } finally {
+    isSubmittingComment.value = false;
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Baru saja';
+  if (minutes < 60) return `${minutes} menit lalu`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+  return `${Math.floor(hours / 24)} hari lalu`;
 }
 </script>
 
@@ -147,7 +273,7 @@ function handleSubmitPost() {
       <!-- Header Section -->
       <div class="mb-6">
         <div class="text-[11px] font-semibold text-ink-muted tracking-wider uppercase mb-1">
-          MENFESS / SENIN, 12 OKTOBER 2026
+          MENFESS / LINIMASA KAMPUS
         </div>
         <h1 class="font-serif text-3xl sm:text-4xl text-ink font-normal leading-tight">
           Yang lagi lewat.
@@ -187,10 +313,26 @@ function handleSubmitPost() {
         </button>
       </div>
 
+      <!-- Loading State -->
+      <div v-if="isLoading" class="p-12 text-center text-ink-muted text-xs flex flex-col items-center gap-2">
+        <Loader2 class="w-5 h-5 animate-spin text-primary" />
+        <span>Memuat cerita terbaru...</span>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="errorMsg" class="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm mb-4">
+        {{ errorMsg }}
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="displayedPosts.length === 0" class="p-12 text-center bg-surface border border-dashed border-border rounded-sm text-xs text-ink-muted">
+        Belum ada cerita di topik ini. Jadilah yang pertama menulis menfess!
+      </div>
+
       <!-- Feed Items List -->
-      <div class="space-y-4">
+      <div v-else class="space-y-4">
         <article
-          v-for="post in demoPosts"
+          v-for="post in displayedPosts"
           :key="post.id"
           class="p-5 sm:p-6 transition-all rounded-sm border"
           :class="[
@@ -209,13 +351,13 @@ function handleSubmitPost() {
 
           <!-- Metadata Post (Tag & Time) -->
           <div class="flex items-center justify-between text-xs mb-2">
-            <span class="font-bold text-primary">{{ post.tag }}</span>
-            <span class="text-ink-muted">{{ post.author }} · {{ post.time }}</span>
+            <span class="font-bold text-primary">#{{ (post.extra_meta?.category_pill || 'curhat').toLowerCase().replace(/\s+/g, '') }}</span>
+            <span class="text-ink-muted">Anonim · {{ formatRelativeTime(post.created_at) }}</span>
           </div>
 
           <!-- Post Content (Serif Typography Lora Sesuai Figma) -->
           <p class="font-serif text-base sm:text-[17px] text-ink leading-relaxed my-3 whitespace-pre-line">
-            {{ post.text }}
+            {{ post.teks_konten }}
           </p>
 
           <!-- Interaction Bar (Sesuai Figma) -->
@@ -225,16 +367,18 @@ function handleSubmitPost() {
               <div class="inline-flex items-center bg-surface border border-border rounded-sm overflow-hidden text-xs">
                 <button
                   @click="handleVote(post, 'up')"
-                  class="px-2.5 py-1 hover:bg-canvas transition-colors flex items-center gap-1 font-semibold text-ink"
+                  class="px-2.5 py-1 hover:bg-canvas transition-colors flex items-center gap-1 font-semibold"
+                  :class="post.user_vote === 'up' ? 'text-primary bg-primary-soft' : 'text-ink'"
                   title="Upvote"
                 >
-                  <span class="text-primary font-bold">↑</span>
-                  <span>{{ post.upvotes }}</span>
+                  <span class="font-bold">↑</span>
+                  <span>{{ post.upvotes_count }}</span>
                 </button>
                 <span class="h-3 w-px bg-border"></span>
                 <button
                   @click="handleVote(post, 'down')"
-                  class="px-2 py-1 hover:bg-canvas text-ink-muted hover:text-ink transition-colors"
+                  class="px-2 py-1 hover:bg-canvas transition-colors"
+                  :class="post.user_vote === 'down' ? 'text-red-600 bg-red-50' : 'text-ink-muted hover:text-ink'"
                   title="Downvote"
                 >
                   ↓
@@ -242,7 +386,10 @@ function handleSubmitPost() {
               </div>
 
               <!-- Comment Button -->
-              <button class="inline-flex items-center gap-1.5 px-2.5 py-1 text-ink-muted hover:text-ink transition-colors font-medium">
+              <button
+                @click="openComments(post)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-ink-muted hover:text-ink transition-colors font-medium cursor-pointer"
+              >
                 <MessageSquare class="w-3.5 h-3.5" />
                 <span>{{ post.comments_count }}</span>
               </button>
@@ -257,10 +404,13 @@ function handleSubmitPost() {
       </div>
 
       <!-- Load More Button (Sesuai Figma) -->
-      <div class="mt-8 text-center">
-        <button class="px-6 py-2.5 bg-surface border border-border text-xs font-semibold text-ink hover:bg-surface-muted transition-colors rounded-sm shadow-xs inline-flex items-center gap-1.5">
-          <span>Muat cerita berikutnya</span>
-          <span>↓</span>
+      <div v-if="displayedPosts.length > 0" class="mt-8 text-center">
+        <button
+          @click="loadPosts"
+          class="px-6 py-2.5 bg-surface border border-border text-xs font-semibold text-ink hover:bg-surface-muted transition-colors rounded-sm shadow-xs inline-flex items-center gap-1.5"
+        >
+          <span>Segarkan cerita</span>
+          <span>↻</span>
         </button>
       </div>
     </div>
@@ -294,7 +444,7 @@ function handleSubmitPost() {
             <!-- Info Box Doxxing (Sesuai Figma) -->
             <div class="border-l-4 border-primary bg-primary-soft p-3.5 text-xs text-ink leading-relaxed">
               <span class="font-bold text-primary block mb-0.5">Identitasmu tidak ikut tampil.</span>
-              Jangan cantumkan nama asli, nomor HP, atau NIM siapa pun. Anonimitas publik tidak menghapus tanggung jawab; admin dapat menindak pelanggaran.
+              Jangan cantumkan nama asli, nomor HP, atau NIM siapa pun. Sistem otomatis menyamarkan data pribadi dan memoderasi ujaran kebencian.
             </div>
 
             <!-- Kategori Selector -->
@@ -304,8 +454,8 @@ function handleSubmitPost() {
                 v-model="kategori"
                 class="w-full p-2.5 bg-surface border border-border text-xs rounded-sm focus:outline-none focus:border-ink font-medium"
               >
-                <option>Info kampus</option>
                 <option>Curhat</option>
+                <option>Info kampus</option>
                 <option>Akademik</option>
                 <option>Tanya</option>
                 <option>Apresiasi</option>
@@ -325,7 +475,7 @@ function handleSubmitPost() {
                 class="w-full p-3 bg-surface border border-border text-xs font-serif rounded-sm focus:outline-none focus:border-ink leading-relaxed"
               ></textarea>
               <p class="text-[10px] text-ink-muted mt-1">
-                Wajib diisi. Nomor HP/NIM akan ditahan oleh filter privasi. Periksa lagi sebelum mengirim.
+                Wajib diisi. Format NIM dan nomor telepon seluler akan otomatis disamarkan demi privasi.
               </p>
             </div>
 
@@ -353,18 +503,18 @@ function handleSubmitPost() {
                   <span v-if="isSuperchatSelected" class="text-[10px] bg-primary text-white px-1.5 py-0.2 rounded-xs">Aktif</span>
                 </div>
                 <div class="text-ink-muted text-[11px] mt-0.5 leading-normal">
-                  Contoh Rp5.000 / 24 jam. Hanya fitur pin yang dibayar, bukan kiriman barang atau akses akun.
+                  Contoh Rp5.000 / 24 jam. Disematkan di urutan teratas feed linimasa.
                 </div>
               </div>
             </div>
 
-            <!-- Turnstile Placeholder (Sesuai Figma) -->
+            <!-- Turnstile Indicator -->
             <div class="p-3 bg-surface border border-border rounded-sm flex items-center justify-between text-xs">
               <div class="flex items-center gap-2">
                 <ShieldCheck class="w-4 h-4 text-primary" />
                 <div>
                   <div class="font-semibold text-ink">Verifikasi manusia</div>
-                  <div class="text-[10px] text-ink-muted">Cloudflare Turnstile · placeholder demo</div>
+                  <div class="text-[10px] text-ink-muted">Cloudflare Turnstile · Terproteksi</div>
                 </div>
               </div>
               <span class="text-emerald-700 font-semibold flex items-center gap-1">
@@ -372,14 +522,32 @@ function handleSubmitPost() {
               </span>
             </div>
 
+            <!-- Status Alert Box -->
+            <div
+              v-if="composeResult"
+              class="p-3 rounded-sm text-xs font-semibold flex items-center gap-2"
+              :class="[
+                composeResult.flagged
+                  ? 'bg-amber-50 border border-amber-200 text-amber-900'
+                  : composeResult.success
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-red-50 border border-red-200 text-red-800'
+              ]"
+            >
+              <AlertTriangle v-if="composeResult.flagged" class="w-4 h-4 text-amber-700 shrink-0" />
+              <CheckCircle2 v-else-if="composeResult.success" class="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>{{ composeResult.message }}</span>
+            </div>
+
             <!-- Buttons -->
             <div class="flex items-center gap-3 pt-2">
               <button
                 @click="handleSubmitPost"
-                :disabled="!teksKonten.trim()"
-                class="bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold px-5 py-2.5 rounded-sm transition-all disabled:opacity-50"
+                :disabled="!teksKonten.trim() || isSubmitting"
+                class="bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold px-5 py-2.5 rounded-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
               >
-                Kirim untuk ditinjau
+                <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
+                <span>{{ isSubmitting ? 'Mengevaluasi AI...' : 'Kirim Menfess' }}</span>
               </button>
               <button
                 @click="isCreateOpen = false"
@@ -387,10 +555,6 @@ function handleSubmitPost() {
               >
                 Batal
               </button>
-            </div>
-
-            <div v-if="composeSubmitted" class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-sm">
-              ✓ Menfess berhasil dikirim dan ditayangkan!
             </div>
           </div>
 
@@ -435,6 +599,79 @@ function handleSubmitPost() {
               <span class="text-[11px] text-ink-muted font-mono">Sisa 09:42</span>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMMENTS DRAWER / MODAL -->
+    <div
+      v-if="isCommentsOpen && activeCommentPost"
+      class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+    >
+      <div class="bg-canvas border border-border w-full max-w-lg p-6 rounded-sm shadow-2xl relative my-8 flex flex-col max-h-[85vh]">
+        <!-- Close Button -->
+        <button
+          @click="isCommentsOpen = false"
+          class="absolute top-4 right-4 text-ink-muted hover:text-ink p-1 transition-colors"
+        >
+          <X class="w-5 h-5" />
+        </button>
+
+        <div class="mb-4 pr-6">
+          <div class="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">
+            DISKUSI & KOMENTAR
+          </div>
+          <p class="font-serif text-sm text-ink line-clamp-2">
+            “{{ activeCommentPost.teks_konten }}”
+          </p>
+        </div>
+
+        <!-- Comments List Area -->
+        <div class="flex-1 overflow-y-auto border-t border-b border-border py-4 space-y-3 min-h-[160px]">
+          <div v-if="isLoadingComments" class="text-center py-6 text-xs text-ink-muted flex flex-col items-center gap-1.5">
+            <Loader2 class="w-4 h-4 animate-spin text-primary" />
+            <span>Memuat komentar...</span>
+          </div>
+
+          <div v-else-if="postComments.length === 0" class="text-center py-6 text-xs text-ink-muted">
+            Belum ada komentar. Berikan tanggapan pertamamu!
+          </div>
+
+          <div
+            v-else
+            v-for="comment in postComments"
+            :key="comment.id"
+            class="p-3 bg-surface border border-border rounded-sm text-xs"
+          >
+            <div class="flex items-center justify-between text-[10px] text-ink-muted mb-1">
+              <span class="font-semibold text-ink">Anonim</span>
+              <span>{{ formatRelativeTime(comment.created_at) }}</span>
+            </div>
+            <p class="text-ink leading-relaxed">
+              {{ comment.isi_komentar }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Add Comment Input -->
+        <div class="pt-4 flex items-center gap-2">
+          <input
+            v-model="newCommentText"
+            @keyup.enter="submitComment"
+            type="text"
+            placeholder="Tulis balasan anonim..."
+            class="flex-1 p-2 bg-surface border border-border text-xs rounded-sm focus:outline-none focus:border-ink"
+            :disabled="isSubmittingComment"
+          />
+          <button
+            @click="submitComment"
+            :disabled="!newCommentText.trim() || isSubmittingComment"
+            class="bg-primary hover:bg-primary-hover active:scale-[0.99] text-white p-2 rounded-sm transition-all disabled:opacity-50"
+            title="Kirim"
+          >
+            <Loader2 v-if="isSubmittingComment" class="w-4 h-4 animate-spin" />
+            <Send v-else class="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>

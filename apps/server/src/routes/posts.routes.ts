@@ -1,15 +1,22 @@
+// =====================================================================
+// POSTS ROUTES - MENFESSIN AJA
+// =====================================================================
+
 import { Hono } from 'hono';
+import { PostController } from '../controllers/post.controller.js';
+import { optionalAuth, requireAuth } from '../middlewares/auth.middleware.js';
 
 export const postsRouter = new Hono();
 
-postsRouter.get('/', (c) => {
-  return c.json({ message: 'Posts feed list endpoint siap untuk Sprint 2 & 3' });
-});
+// Feed linimasa publik (optional auth untuk status vote)
+postsRouter.get('/', optionalAuth, PostController.getPosts);
 
-postsRouter.post('/create', (c) => {
-  return c.json({ message: 'Create post endpoint siap untuk Sprint 2 & 3' });
-});
+// Kirim menfess (wajib login)
+postsRouter.post('/menfess', requireAuth, PostController.createMenfess);
 
-postsRouter.get('/:id', (c) => {
-  return c.json({ message: 'Post detail endpoint siap untuk Sprint 2 & 3' });
-});
+// Vote postingan (wajib login)
+postsRouter.post('/:id/vote', requireAuth, PostController.votePost);
+
+// Komentar
+postsRouter.get('/:id/comments', PostController.getComments);
+postsRouter.post('/:id/comments', requireAuth, PostController.createComment);

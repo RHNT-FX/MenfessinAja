@@ -35,6 +35,23 @@ export async function requireAuth(c: Context, next: Next) {
 }
 
 /**
+ * Middleware untuk mengekstrak user secara opsional jika token Bearer disertakan
+ */
+export async function optionalAuth(c: Context, next: Next) {
+  const authHeader = c.req.header('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    try {
+      const user = await AuthService.verifyToken(token);
+      c.set('user', user);
+    } catch {
+      // Abaikan jika token kedaluwarsa atau guest
+    }
+  }
+  await next();
+}
+
+/**
  * Middleware untuk membatasi endpoint khusus Administrator (Sesuai SDD 1.2 & 6)
  */
 export async function requireAdmin(c: Context, next: Next) {
