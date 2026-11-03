@@ -11,20 +11,26 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-canvas text-slate-800 font-sans selection:bg-blue-100 selection:text-blue-700">
+  <div class="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-blue-100 selection:text-blue-900">
     <!-- Navbar Header -->
     <AppNavbar />
 
-    <!-- Main Content Area (Mobile-First responsive container) -->
-    <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-6 sm:py-8">
+    <!-- Main Content Area -->
+    <main class="flex-1 w-full max-w-[1360px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
       <router-view />
     </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-surface-border bg-surface py-6 text-center text-xs text-slate-500">
-      <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <p>© 2026 Menfessin Aja. Hyperlocal Campus Community Platform.</p>
-        <p class="text-[11px] text-slate-400">Dibuat sesuai dokumen spesifikasi SRS & SDD (v1.0)</p>
+    <!-- Footer (Sesuai Figma) -->
+    <footer class="border-t border-border bg-canvas py-8 text-xs text-ink-muted">
+      <div class="max-w-[1360px] mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p class="font-medium">GUEH / Menfessin aja. © 2026</p>
+        <div class="flex items-center gap-4 text-ink-muted">
+          <a href="#privasi" class="hover:text-ink transition-colors">Privasi</a>
+          <span>/</span>
+          <a href="#pedoman" class="hover:text-ink transition-colors">Pedoman</a>
+          <span>/</span>
+          <a href="#bantuan" class="hover:text-ink transition-colors">Bantuan</a>
+        </div>
       </div>
     </footer>
   </div>

@@ -7,36 +7,39 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: '#FAF9F6', // Warm off-white sesuai Figma
-        primary: {
-          DEFAULT: '#2563EB', // Cobalt blue aksen utama Figma
-          hover: '#1D4ED8',
-          light: '#EFF6FF',
-          dark: '#1E40AF',
-        },
+        canvas: '#F5F2EA',      // Background warm parchment Figma
         surface: {
-          DEFAULT: '#FFFFFF',
-          muted: '#F3F4F6',
-          border: '#E5E7EB',
+          DEFAULT: '#FFFEFA',  // Surface card & form input
+          muted: '#EAE6DC',
+        },
+        ink: {
+          DEFAULT: '#20211F',  // Primary dark charcoal text
+          muted: '#706F68',    // Secondary subtext
+          light: '#9E9B92',
+        },
+        border: {
+          DEFAULT: '#CDCAC1',  // Subtle parchment divider line
+          light: '#EAE6DC',
+          dark: '#20211F',
+        },
+        primary: {
+          DEFAULT: '#284DB0',  // Editorial royal blue
+          hover: '#1E3F96',
+          soft: '#E9EDF6',     // Light blue superchat & active menu
+          dark: '#172F6E',
         },
         badge: {
-          superchat: '#FEF3C7',
-          superchatText: '#92400E',
-          boost: '#EDE9FE',
-          boostText: '#5B21B6',
-          lost: '#FEE2E2',
-          lostText: '#991B1B',
-          found: '#DCFCE7',
-          foundText: '#166534',
+          superchatBg: '#F3EBD6',
+          superchatText: '#865F20',
+          foundBg: '#EAF0E7',
+          foundText: '#41634B',
+          lostBg: '#F5E6DF',
+          lostText: '#A43C2C',
         }
-      },
-      borderRadius: {
-        'xl': '0.75rem',
-        '2xl': '1rem',
-        '3xl': '1.5rem',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['Lora', 'Georgia', 'serif'],
       }
     },
   },
