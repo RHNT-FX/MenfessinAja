@@ -63,6 +63,7 @@ const turnstileToken = ref('demo-turnstile-token');
 
 // Live AI & Privacy Moderation Inspector
 interface AiPreviewData {
+  originalText?: string;
   sanitizedText: string;
   nimMaskedCount: number;
   phoneMaskedCount: number;
@@ -97,7 +98,19 @@ async function checkAiModeration() {
       body: JSON.stringify({ teks_konten: teksKonten.value })
     });
     if (res.success && res.data) {
-      aiPreview.value = res.data;
+      const d = res.data;
+      const score = typeof d.aiScore === 'number' ? d.aiScore : (typeof d.ai_score === 'number' ? d.ai_score : 0.05);
+      aiPreview.value = {
+        originalText: d.originalText || teksKonten.value,
+        sanitizedText: d.sanitizedText || d.sanitized_content || teksKonten.value,
+        nimMaskedCount: d.nimMaskedCount || 0,
+        phoneMaskedCount: d.phoneMaskedCount || 0,
+        aiScore: score,
+        isSafe: typeof d.isSafe === 'boolean' ? d.isSafe : (score < 0.70),
+        status: d.status || (score >= 0.70 ? 'flagged' : 'approved'),
+        flags: d.flags || [],
+        reason: d.reason || ''
+      };
     }
   } catch (err) {
     console.error('Gagal evaluasi AI:', err);
@@ -743,8 +756,8 @@ function formatRelativeTime(dateStr?: string): string {
                 <div v-if="aiPreview" class="space-y-1.5 text-[11px]">
                   <div class="flex items-center justify-between text-ink">
                     <span>Skor Probabilitas AI:</span>
-                    <span class="font-mono font-bold" :class="aiPreview.aiScore >= 0.70 ? 'text-red-700' : 'text-emerald-700'">
-                      {{ aiPreview.aiScore.toFixed(2) }} / 1.00 {{ aiPreview.aiScore >= 0.70 ? '(≥ 0.70 Ambang Flagged)' : '(< 0.70 Aman)' }}
+                    <span class="font-mono font-bold" :class="(aiPreview.aiScore ?? 0) >= 0.70 ? 'text-red-700' : 'text-emerald-700'">
+                      {{ (aiPreview.aiScore ?? 0).toFixed(2) }} / 1.00 {{ (aiPreview.aiScore ?? 0) >= 0.70 ? '(≥ 0.70 Ambang Flagged)' : '(< 0.70 Aman)' }}
                     </span>
                   </div>
 
@@ -752,8 +765,8 @@ function formatRelativeTime(dateStr?: string): string {
                   <div class="w-full bg-border/60 h-1.5 rounded-full overflow-hidden">
                     <div
                       class="h-full transition-all duration-300 rounded-full"
-                      :class="aiPreview.aiScore >= 0.70 ? 'bg-red-600' : 'bg-emerald-600'"
-                      :style="{ width: `${Math.min(100, Math.max(5, aiPreview.aiScore * 100))}%` }"
+                      :class="(aiPreview.aiScore ?? 0) >= 0.70 ? 'bg-red-600' : 'bg-emerald-600'"
+                      :style="{ width: `${Math.min(100, Math.max(5, (aiPreview.aiScore ?? 0) * 100))}%` }"
                     ></div>
                   </div>
 

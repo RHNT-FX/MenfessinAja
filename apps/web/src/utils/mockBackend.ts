@@ -182,12 +182,33 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
   // 2. POST /api/posts/preview-moderation
   if (path === '/api/posts/preview-moderation' && method === 'POST') {
     const body = options.body ? JSON.parse(options.body) : {};
+    const text = body.teks_konten || body.content || '';
+    
+    // Mask NIM and phone
+    const nimMatches = text.match(/\b(1124\d{4})\b/g) || [];
+    const phoneMatches = text.match(/\b(08\d{8,11})\b/g) || [];
+    let sanitizedText = text.replace(/\b(1124\d{4})\b/g, '1124****');
+    sanitizedText = sanitizedText.replace(/\b(08\d{8,11})\b/g, '0812****09');
+
+    // Toxicity check
+    const toxicWords = ['anjing', 'bangsat', 'kontol', 'tolol', 'hajar', 'bunuh', 'bajingan', 'kampret'];
+    const isToxic = toxicWords.some((w: string) => text.toLowerCase().includes(w));
+    const aiScore = isToxic ? 0.88 : 0.05;
+    const isSafe = aiScore < 0.70;
+
     return {
       success: true,
       data: {
-        status: 'approved',
-        ai_score: 0.05,
-        sanitized_content: body.content || body.teks_konten || ''
+        originalText: text,
+        sanitizedText,
+        nimMaskedCount: nimMatches.length,
+        phoneMaskedCount: phoneMatches.length,
+        aiScore,
+        ai_score: aiScore,
+        isSafe,
+        status: isSafe ? 'approved' : 'flagged',
+        flags: isToxic ? ['Kekerasan / Ujaran Makian'] : [],
+        reason: isToxic ? 'Terdeteksi kata makian atau ancaman agresif' : 'Teks wajar dan aman dipublikasikan'
       }
     };
   }
