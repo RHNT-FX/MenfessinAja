@@ -255,6 +255,43 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
     };
   }
 
+  // 0.3 PUT /api/auth/profile
+  if (path === '/api/auth/profile' && method === 'PUT') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    let currentUser: any = {
+      id: '00000000-0000-0000-0000-000000000002',
+      email: body.email || 'student@menfessinaja.ac.id',
+      role: 'member',
+      status: 'active',
+      created_at: new Date().toISOString()
+    };
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) currentUser = JSON.parse(raw);
+    } catch {}
+    if (body.email) {
+      currentUser.email = body.email.toLowerCase().trim();
+    }
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    return {
+      success: true,
+      message: 'Profil berhasil diperbarui',
+      data: { user: currentUser }
+    };
+  }
+
+  // 0.4 PUT /api/auth/password
+  if (path === '/api/auth/password' && method === 'PUT') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (!body.old_password || !body.new_password) {
+      throw new Error('Kata sandi lama dan baru wajib diisi');
+    }
+    return {
+      success: true,
+      message: 'Kata sandi berhasil diubah'
+    };
+  }
+
   // 1. GET /api/posts
   if (path === '/api/posts' && method === 'GET') {
     let posts = getStoredPosts();

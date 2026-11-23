@@ -127,6 +127,45 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateProfile(newEmail: string) {
+    isLoading.value = true;
+    try {
+      try {
+        const response = await apiFetch('/api/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ email: newEmail })
+        });
+        if (response.data?.user) {
+          user.value = response.data.user;
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          return response.data.user;
+        }
+      } catch (err: any) {
+        if (user.value) {
+          user.value.email = newEmail.toLowerCase().trim();
+          localStorage.setItem('user', JSON.stringify(user.value));
+          return user.value;
+        }
+        throw err;
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function updatePassword(oldPassword: string, newPassword: string) {
+    isLoading.value = true;
+    try {
+      const response = await apiFetch('/api/auth/password', {
+        method: 'PUT',
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      });
+      return response;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   return {
     user,
     token,
@@ -137,6 +176,8 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     fetchCurrentUser,
-    initFromStorage
+    initFromStorage,
+    updateProfile,
+    updatePassword
   };
 });

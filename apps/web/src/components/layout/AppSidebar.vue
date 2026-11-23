@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth';
-import { HelpCircle, MessageSquare, ShoppingBag } from 'lucide-vue-next';
+import { HelpCircle, MessageSquare, ShoppingBag, User } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
@@ -54,6 +54,16 @@ const topics = [
         >
           <HelpCircle class="w-4 h-4" />
           <span>Lost & Found</span>
+        </router-link>
+
+        <router-link
+          v-if="authStore.isAuthenticated"
+          to="/profil"
+          class="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors"
+          :class="route.path.startsWith('/profil') ? 'bg-primary-soft text-primary font-bold' : 'text-ink hover:bg-surface-muted font-medium'"
+        >
+          <User class="w-4 h-4" />
+          <span>Profil Saya</span>
         </router-link>
       </div>
     </div>

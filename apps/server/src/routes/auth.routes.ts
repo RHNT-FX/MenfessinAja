@@ -10,3 +10,5 @@ authRouter.post('/login', AuthController.login);
 
 // Terproteksi dengan JWT
 authRouter.get('/me', requireAuth, AuthController.me);
+authRouter.put('/profile', requireAuth, AuthController.updateProfile);
+authRouter.put('/password', requireAuth, AuthController.updatePassword);

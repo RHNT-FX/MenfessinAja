@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth';
-import { LogOut, Search, ShieldCheck } from 'lucide-vue-next';
+import { LogOut, Search, ShieldCheck, User } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -65,17 +65,22 @@ function handleLogout() {
             <span>ADMIN • Sesi aman</span>
           </router-link>
 
-          <!-- Member Pill Badge (Sesuai Figma) -->
-          <div v-else class="flex items-center gap-1.5 px-3 py-1 bg-primary-soft text-primary font-semibold rounded-full text-xs">
-            <span class="w-2 h-2 rounded-full bg-primary inline-block"></span>
-            <span>Anggota</span>
-          </div>
+          <!-- Profile Link Badge -->
+          <router-link
+            to="/profil"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-primary-soft text-primary font-semibold rounded-full text-xs hover:bg-blue-100 transition-colors"
+            :class="route.path === '/profil' ? 'ring-2 ring-primary font-bold' : ''"
+            title="Buka Profil & Pengaturan Akun"
+          >
+            <User class="w-3.5 h-3.5 text-primary" />
+            <span>Profil Saya</span>
+          </router-link>
 
           <!-- Logout Button -->
           <button
             @click="handleLogout"
             title="Keluar"
-            class="p-1.5 rounded text-ink-muted hover:text-red-700 transition-colors"
+            class="p-1.5 rounded text-ink-muted hover:text-red-700 transition-colors cursor-pointer"
           >
             <LogOut class="w-4 h-4" />
           </button>
@@ -116,6 +121,14 @@ function handleLogout() {
         :class="route.path.startsWith('/lost-found') ? 'text-ink border-b-2 border-ink' : 'text-ink-muted hover:text-ink'"
       >
         Lost & Found
+      </router-link>
+      <router-link
+        v-if="authStore.isAuthenticated"
+        to="/profil"
+        class="py-2.5 transition-colors whitespace-nowrap"
+        :class="route.path.startsWith('/profil') ? 'text-ink border-b-2 border-ink font-bold' : 'text-ink-muted hover:text-ink'"
+      >
+        Profil
       </router-link>
     </div>
   </header>

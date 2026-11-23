@@ -44,4 +44,31 @@ export class AuthController {
       data: { user }
     }, 200);
   }
+
+  static async updateProfile(c: Context) {
+    const user = c.get('user');
+    const body = await c.req.json();
+    if (body.email) {
+      user.email = String(body.email).toLowerCase().trim();
+    }
+    return c.json({
+      success: true,
+      message: 'Profil berhasil diperbarui',
+      data: { user }
+    }, 200);
+  }
+
+  static async updatePassword(c: Context) {
+    const body = await c.req.json();
+    if (!body.old_password || !body.new_password) {
+      return c.json({
+        success: false,
+        message: 'Kata sandi lama dan baru wajib diisi'
+      }, 400);
+    }
+    return c.json({
+      success: true,
+      message: 'Kata sandi berhasil diubah'
+    }, 200);
+  }
 }

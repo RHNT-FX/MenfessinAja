@@ -6,6 +6,7 @@ import HelpView from '../views/HelpView.vue';
 import LoginView from '../views/LoginView.vue';
 import LostFoundView from '../views/LostFoundView.vue';
 import MarketplaceView from '../views/MarketplaceView.vue';
+import ProfileView from '../views/ProfileView.vue';
 import RegisterView from '../views/RegisterView.vue';
 import TimelineView from '../views/TimelineView.vue';
 
@@ -55,6 +56,16 @@ const router = createRouter({
       meta: { title: 'Pusat Bantuan & FAQ' }
     },
     {
+      path: '/profil',
+      name: 'profile',
+      component: ProfileView,
+      meta: { title: 'Profil & Pengaturan Akun', requiresAuth: true }
+    },
+    {
+      path: '/profile',
+      redirect: '/profil'
+    },
+    {
       path: '/faq',
       redirect: '/bantuan'
     },
@@ -96,6 +107,11 @@ router.beforeEach((to, _from, next) => {
   // Guard halaman khusus Tamu / Guest (Login / Register)
   if (to.meta.guestOnly && authStore.isAuthenticated) {
     return next({ path: '/' });
+  }
+
+  // Guard halaman yang butuh login (Profil / Akun)
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return next({ path: '/login', query: { redirect: to.fullPath } });
   }
 
   next();
