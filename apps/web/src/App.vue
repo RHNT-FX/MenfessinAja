@@ -11,7 +11,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-blue-100 selection:text-blue-900">
+  <div class="min-h-screen flex flex-col bg-canvas text-ink font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
     <!-- Navbar Header -->
     <AppNavbar />
 

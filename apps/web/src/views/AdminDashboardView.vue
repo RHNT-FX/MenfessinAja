@@ -197,7 +197,7 @@ function formatTime(isoStr: string) {
 </script>
 
 <template>
-  <div class="flex items-start gap-8">
+  <div class="flex flex-col lg:flex-row items-start gap-6 lg:gap-8 w-full max-w-full">
     <!-- Left Moderator Sidebar (Sesuai Figma 13) -->
     <aside class="w-60 shrink-0 hidden lg:flex flex-col gap-6 text-xs text-ink select-none pr-4">
       <div class="space-y-2.5">

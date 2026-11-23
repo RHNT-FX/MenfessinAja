@@ -40,6 +40,38 @@ const formWa = ref('');
 const turnstileToken = ref('demo-turnstile-token');
 const isSubmitting = ref(false);
 const isSubmitted = ref(false);
+const formError = ref('');
+
+// Form Validations
+const formNamaBarangError = computed(() => {
+  if (!formNamaBarang.value.trim()) return 'Nama barang wajib diisi';
+  if (formNamaBarang.value.trim().length < 3) return 'Nama barang minimal 3 karakter';
+  return '';
+});
+
+const formLokasiError = computed(() => {
+  if (!formLokasi.value.trim()) return 'Lokasi kejadian wajib diisi';
+  if (formLokasi.value.trim().length < 3) return 'Lokasi minimal 3 karakter';
+  return '';
+});
+
+const formCiriError = computed(() => {
+  if (!formCiri.value.trim()) return 'Ciri-ciri & keterangan wajib diisi';
+  if (formCiri.value.trim().length < 5) return 'Ciri-ciri minimal 5 karakter';
+  return '';
+});
+
+const formWaError = computed(() => {
+  if (!formWa.value) return ''; // Opsional di lost & found
+  if (!/^08\d{8,11}$/.test(formWa.value) && !/^628\d{8,11}$/.test(formWa.value)) {
+    return 'Nomor WA harus angka diawali 08/628 (10-13 digit)';
+  }
+  return '';
+});
+
+const isFormValid = computed(() => {
+  return !formNamaBarangError.value && !formLokasiError.value && !formCiriError.value && !formWaError.value;
+});
 
 // WebP image compression state (SRS 1.3.3 & NFR-001)
 const imagePreview = ref('');
@@ -129,7 +161,11 @@ const filteredReports = computed(() => {
 });
 
 async function handleSubmitReport() {
-  if (!formNamaBarang.value.trim() || !formLokasi.value.trim() || !formCiri.value.trim() || isSubmitting.value) return;
+  if (!isFormValid.value) {
+    formError.value = formNamaBarangError.value || formLokasiError.value || formCiriError.value || formWaError.value || 'Mohon lengkapi semua kolom wajib';
+    return;
+  }
+  formError.value = '';
 
   if (!authStore.isAuthenticated) {
     router.push('/login');
@@ -201,7 +237,7 @@ async function handleResolve(item: LostFoundItem) {
 </script>
 
 <template>
-  <div class="flex items-start gap-8">
+  <div class="flex flex-col lg:flex-row items-start gap-6 lg:gap-8 w-full max-w-full">
     <!-- Left Sidebar (Sesuai Figma) -->
     <AppSidebar />
 
@@ -382,6 +418,11 @@ async function handleResolve(item: LostFoundItem) {
           </div>
 
           <form @submit.prevent="handleSubmitReport" class="space-y-3.5 text-xs">
+            <!-- Alert Banner jika ada error validasi -->
+            <div v-if="formError" class="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm">
+              {{ formError }}
+            </div>
+
             <div>
               <label class="block font-semibold text-ink mb-1">Nama Barang *</label>
               <input
@@ -389,8 +430,12 @@ async function handleResolve(item: LostFoundItem) {
                 type="text"
                 required
                 placeholder="Contoh: Dompet cokelat, Kunci motor..."
-                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+                class="w-full p-2.5 bg-surface border rounded-sm focus:outline-none transition-colors"
+                :class="formNamaBarang && formNamaBarangError ? 'border-red-400 focus:border-red-500' : 'border-border focus:border-ink'"
               />
+              <p v-if="formNamaBarang && formNamaBarangError" class="text-[11px] text-red-500 mt-1">
+                {{ formNamaBarangError }}
+              </p>
             </div>
 
             <div>
@@ -400,8 +445,12 @@ async function handleResolve(item: LostFoundItem) {
                 type="text"
                 required
                 placeholder="Contoh: Kantin gedung A, Ruang baca perpus..."
-                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+                class="w-full p-2.5 bg-surface border rounded-sm focus:outline-none transition-colors"
+                :class="formLokasi && formLokasiError ? 'border-red-400 focus:border-red-500' : 'border-border focus:border-ink'"
               />
+              <p v-if="formLokasi && formLokasiError" class="text-[11px] text-red-500 mt-1">
+                {{ formLokasiError }}
+              </p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -418,10 +467,17 @@ async function handleResolve(item: LostFoundItem) {
                 <label class="block font-semibold text-ink mb-1">No WA Kontak (Opsional)</label>
                 <input
                   v-model="formWa"
-                  type="text"
+                  @input="e => formWa = (e.target as HTMLInputElement).value.replace(/\D/g, '')"
+                  type="tel"
+                  maxlength="14"
+                  inputmode="numeric"
                   placeholder="081234567890"
-                  class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono"
+                  class="w-full p-2.5 bg-surface border rounded-sm focus:outline-none font-mono transition-colors"
+                  :class="formWa && formWaError ? 'border-red-400 focus:border-red-500' : 'border-border focus:border-ink'"
                 />
+                <p v-if="formWa && formWaError" class="text-[11px] text-red-500 mt-1">
+                  {{ formWaError }}
+                </p>
               </div>
             </div>
 
@@ -432,8 +488,12 @@ async function handleResolve(item: LostFoundItem) {
                 rows="3"
                 required
                 placeholder="Ciri unik, warna, gantungan, atau tempat barang dititipkan..."
-                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+                class="w-full p-2.5 bg-surface border rounded-sm focus:outline-none transition-colors"
+                :class="formCiri && formCiriError ? 'border-red-400 focus:border-red-500' : 'border-border focus:border-ink'"
               ></textarea>
+              <p v-if="formCiri && formCiriError" class="text-[11px] text-red-500 mt-1">
+                {{ formCiriError }}
+              </p>
             </div>
 
             <!-- WebP Image Upload Section (SRS 1.3.3 & NFR-001) -->
@@ -483,8 +543,8 @@ async function handleResolve(item: LostFoundItem) {
 
             <button
               type="submit"
-              :disabled="isSubmitting || !formNamaBarang.trim()"
-              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+              :disabled="isSubmitting || !isFormValid"
+              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
               <span>Publikasikan Laporan</span>

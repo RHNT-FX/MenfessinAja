@@ -294,16 +294,35 @@ async function handleVote(post: FeedPost, direction: 'up' | 'down') {
     return;
   }
 
+  // Optimistic UI toggle
+  const prevVote = post.user_vote;
+  const prevCount = post.upvotes_count || 0;
+
+  if (post.user_vote === direction) {
+    post.user_vote = null;
+    if (direction === 'up') post.upvotes_count = Math.max(0, post.upvotes_count - 1);
+  } else {
+    if (direction === 'up') {
+      post.upvotes_count += (post.user_vote === 'down' ? 2 : 1);
+    } else {
+      post.upvotes_count = Math.max(0, post.upvotes_count - (post.user_vote === 'up' ? 2 : 1));
+    }
+    post.user_vote = direction;
+  }
+
   try {
     const res = await apiFetch(`/api/posts/${post.id}/vote`, {
       method: 'POST',
       body: JSON.stringify({ type: direction })
     });
     if (res.success && res.data) {
-      post.upvotes_count = res.data.upvotes_count;
+      post.upvotes_count = res.data.upvotes_count ?? res.data.upvotes ?? post.upvotes_count;
       post.user_vote = res.data.user_vote;
     }
   } catch (err: any) {
+    // Revert optimistic on error
+    post.user_vote = prevVote;
+    post.upvotes_count = prevCount;
     console.error('Vote gagal:', err);
   }
 }
@@ -426,7 +445,7 @@ async function openComments(post: FeedPost) {
   try {
     const res = await apiFetch(`/api/posts/${post.id}/comments`);
     if (res.success && res.data) {
-      postComments.value = res.data;
+      postComments.value = Array.isArray(res.data) ? res.data : (res.data?.comments || []);
     }
   } catch (err) {
     console.error('Gagal memuat komentar:', err);
@@ -444,16 +463,24 @@ async function submitComment() {
   }
 
   isSubmittingComment.value = true;
+  const commentPayload = newCommentText.value;
   try {
     const res = await apiFetch(`/api/posts/${activeCommentPost.value.id}/comments`, {
       method: 'POST',
       body: JSON.stringify({
-        isi_komentar: newCommentText.value
+        isi_komentar: commentPayload
       })
     });
 
     if (res.success && res.data) {
-      postComments.value.push(res.data);
+      const commentItem = (res.data as any).comment || res.data;
+      postComments.value.push({
+        id: commentItem.id || 'c-' + Date.now(),
+        post_id: activeCommentPost.value.id,
+        user_id: authStore.user?.id || '00000000-0000-0000-0000-000000000002',
+        isi_komentar: commentItem.isi_komentar || commentItem.konten || commentPayload,
+        created_at: commentItem.created_at || new Date().toISOString()
+      });
       activeCommentPost.value.comments_count = (activeCommentPost.value.comments_count || 0) + 1;
       newCommentText.value = '';
     }
@@ -478,7 +505,7 @@ function formatRelativeTime(dateStr?: string): string {
 </script>
 
 <template>
-  <div class="flex items-start gap-8">
+  <div class="flex flex-col lg:flex-row items-start gap-6 lg:gap-8 w-full max-w-full">
     <!-- Left Sidebar (Sesuai Figma) -->
     <AppSidebar
       @open-create="handleOpenCreate"
@@ -486,7 +513,7 @@ function formatRelativeTime(dateStr?: string): string {
     />
 
     <!-- Main Feed Area (Sesuai Figma 01_Menfess_feed_Desktop.png) -->
-    <div class="flex-1 min-w-0 max-w-3xl">
+    <div class="flex-1 min-w-0 w-full">
       <!-- Header Section -->
       <div class="mb-6">
         <div class="text-[11px] font-semibold text-ink-muted tracking-wider uppercase mb-1">

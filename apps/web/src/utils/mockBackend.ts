@@ -74,6 +74,94 @@ const initialPosts: MockPost[] = [
       category_pill: '#apresiasi'
     },
     created_at: new Date(Date.now() - 1000 * 60 * 240).toISOString()
+  },
+  {
+    id: 'mkt-demo-1',
+    user_id: '00000000-0000-0000-0000-000000000002',
+    kategori: 'marketplace',
+    teks_konten: 'Kondisi mulus 90%, tidak ada coretan pulpen di bagian materi inti. Cocok untuk mahasiswa TPB atau Teknik semester 1-2.',
+    media_url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
+    ai_score: 0.01,
+    status: 'approved',
+    is_boosted: true,
+    upvotes_count: 5,
+    comments_count: 1,
+    user_vote: null,
+    extra_meta: {
+      judul: 'Buku Kalkulus Purcell Edisi 9',
+      harga: 75000,
+      kategori_barang: 'Buku',
+      kondisi: 'bekas',
+      lokasi: 'Gedung Kuliah Bersama / Perpustakaan',
+      whatsapp: '081234567890',
+      status_barang: 'Tersedia'
+    },
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+  },
+  {
+    id: 'mkt-demo-2',
+    user_id: '00000000-0000-0000-0000-000000000003',
+    kategori: 'marketplace',
+    teks_konten: 'Dijual karena mau pindah kos luar kota. Lampu belajar LED 3 mode warna (putih, warm, natural) lengkap dengan kabel USB type-C.',
+    media_url: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&auto=format&fit=crop&q=80',
+    ai_score: 0.02,
+    status: 'approved',
+    is_boosted: false,
+    upvotes_count: 3,
+    comments_count: 0,
+    user_vote: null,
+    extra_meta: {
+      judul: 'Lampu Belajar Meja Minimalis LED',
+      harga: 45000,
+      kategori_barang: 'Elektronik',
+      kondisi: 'bekas',
+      lokasi: 'Kantin Fakultas Teknik',
+      whatsapp: '085234567891',
+      status_barang: 'Tersedia'
+    },
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString()
+  },
+  {
+    id: 'lf-demo-1',
+    user_id: '00000000-0000-0000-0000-000000000002',
+    kategori: 'lost_found',
+    teks_konten: 'Ditemukan dompet lipat kulit warna cokelat tua di deretan kursi tribun tengah lapangan futsal kampus. Sudah diamankan di pos satpam gerbang utama.',
+    media_url: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=600&auto=format&fit=crop&q=80',
+    ai_score: 0.01,
+    status: 'approved',
+    is_boosted: false,
+    upvotes_count: 12,
+    comments_count: 1,
+    user_vote: null,
+    extra_meta: {
+      judul: 'Dompet Cokelat Kulit',
+      lokasi: 'Tribun Lapangan Futsal',
+      tipe_laporan: 'ditemukan',
+      whatsapp: '081234567890',
+      is_resolved: false
+    },
+    created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString()
+  },
+  {
+    id: 'lf-demo-2',
+    user_id: '00000000-0000-0000-0000-000000000004',
+    kategori: 'lost_found',
+    teks_konten: 'Tolong bantuannya, kunci motor Honda Vario dengan gantungan boneka kecil hitam jatuh di sekitar parkiran motor barat sekitar jam 10 pagi.',
+    media_url: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=600&auto=format&fit=crop&q=80',
+    ai_score: 0.01,
+    status: 'approved',
+    is_boosted: false,
+    upvotes_count: 8,
+    comments_count: 3,
+    user_vote: null,
+    extra_meta: {
+      judul: 'Kunci Motor Honda Vario',
+      lokasi: 'Parkiran Barat Kampus',
+      tipe_laporan: 'hilang',
+      whatsapp: '089876543210',
+      is_resolved: false
+    },
+    created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString()
   }
 ];
 
@@ -169,13 +257,114 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
 
   // 1. GET /api/posts
   if (path === '/api/posts' && method === 'GET') {
-    const posts = getStoredPosts();
+    let posts = getStoredPosts();
+    // Support category filter (e.g. ?kategori=marketplace or ?kategori=lost_found or ?kategori=menfess)
+    const urlParams = endpoint.includes('?') ? new URLSearchParams(endpoint.split('?')[1]) : null;
+    const kategori = urlParams?.get('kategori') || options.params?.kategori;
+    if (kategori) {
+      posts = posts.filter(p => p.kategori === kategori);
+    }
     return {
       success: true,
       data: {
         items: posts,
         total: posts.length
       }
+    };
+  }
+
+  // 1.1 POST /api/posts/marketplace
+  if (path === '/api/posts/marketplace' && method === 'POST') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    const posts = getStoredPosts();
+    const newPost: MockPost = {
+      id: 'mkt-' + Date.now(),
+      user_id: '00000000-0000-0000-0000-000000000002',
+      kategori: 'marketplace',
+      teks_konten: body.deskripsi || body.teks_konten || '',
+      media_url: body.media_url || null,
+      ai_score: 0.01,
+      status: 'approved',
+      is_boosted: false,
+      upvotes_count: 0,
+      comments_count: 0,
+      user_vote: null,
+      extra_meta: {
+        judul: body.judul,
+        harga: Number(body.harga) || 0,
+        kondisi: body.kondisi || 'bekas',
+        kategori_barang: body.kategori_barang || 'Umum',
+        lokasi: body.lokasi || 'Sekitar kampus',
+        whatsapp: body.whatsapp || '081234567890',
+        status_barang: 'Tersedia'
+      },
+      created_at: new Date().toISOString()
+    };
+    posts.unshift(newPost);
+    savePosts(posts);
+    return {
+      success: true,
+      message: 'Barang marketplace berhasil dipasang',
+      data: {
+        ...newPost,
+        post: newPost
+      }
+    };
+  }
+
+  // 1.2 POST /api/posts/lost_found
+  if (path === '/api/posts/lost_found' && method === 'POST') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    const posts = getStoredPosts();
+    const newPost: MockPost = {
+      id: 'lf-' + Date.now(),
+      user_id: '00000000-0000-0000-0000-000000000002',
+      kategori: 'lost_found',
+      teks_konten: body.deskripsi || body.teks_konten || '',
+      media_url: body.media_url || null,
+      ai_score: 0.01,
+      status: 'approved',
+      is_boosted: false,
+      upvotes_count: 0,
+      comments_count: 0,
+      user_vote: null,
+      extra_meta: {
+        judul: body.judul,
+        lokasi: body.lokasi || 'Kampus',
+        tipe_laporan: body.tipe_laporan || 'ditemukan',
+        whatsapp: body.whatsapp || '081234567890',
+        is_resolved: false
+      },
+      created_at: new Date().toISOString()
+    };
+    posts.unshift(newPost);
+    savePosts(posts);
+    return {
+      success: true,
+      message: 'Laporan Lost & Found berhasil dipublikasikan',
+      data: {
+        ...newPost,
+        post: newPost
+      }
+    };
+  }
+
+  // 1.3 PUT /api/posts/:id/resolve
+  if (path.includes('/resolve') && (method === 'PUT' || method === 'POST')) {
+    const postId = path.split('/')[3];
+    const posts = getStoredPosts();
+    const target = posts.find(p => p.id === postId);
+    if (target) {
+      target.status = 'resolved';
+      if (target.extra_meta) {
+        target.extra_meta.is_resolved = true;
+        target.extra_meta.status_barang = 'Terjual';
+      }
+      savePosts(posts);
+    }
+    return {
+      success: true,
+      message: 'Status berhasil diperbarui'
     };
   }
 
@@ -247,50 +436,105 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
   // 4. POST /api/posts/:id/vote
   if (path.includes('/vote') && method === 'POST') {
     const postId = path.split('/')[3];
+    const body = options.body ? JSON.parse(options.body) : {};
+    const direction = body.type === 'down' ? 'down' : 'up';
     const posts = getStoredPosts();
     const target = posts.find(p => p.id === postId);
     if (target) {
-      target.upvotes_count += 1;
-      target.user_vote = 'up';
+      if (target.user_vote === direction) {
+        // Undo vote
+        if (direction === 'up') target.upvotes_count = Math.max(0, target.upvotes_count - 1);
+        target.user_vote = null;
+      } else {
+        if (direction === 'up') {
+          target.upvotes_count += (target.user_vote === 'down' ? 2 : 1);
+        } else {
+          target.upvotes_count = Math.max(0, target.upvotes_count - (target.user_vote === 'up' ? 2 : 1));
+        }
+        target.user_vote = direction;
+      }
       savePosts(posts);
       return {
         success: true,
-        data: { upvotes: target.upvotes_count, user_vote: 'up' }
+        data: {
+          upvotes: target.upvotes_count,
+          upvotes_count: target.upvotes_count,
+          user_vote: target.user_vote
+        }
       };
     }
-    return { success: true, data: { upvotes: 1, user_vote: 'up' } };
+    return {
+      success: true,
+      data: {
+        upvotes: direction === 'up' ? 1 : 0,
+        upvotes_count: direction === 'up' ? 1 : 0,
+        user_vote: direction
+      }
+    };
   }
 
   // 5. GET /api/posts/:id/comments
   if (path.includes('/comments') && method === 'GET') {
+    const postId = path.split('/')[3];
+    let commentsList: any[] = [];
+    try {
+      const raw = localStorage.getItem('menfessinaja_comments_' + postId);
+      if (raw) commentsList = JSON.parse(raw);
+    } catch {}
+    if (commentsList.length === 0) {
+      commentsList = [
+        {
+          id: 'c-default-1',
+          post_id: postId,
+          user_id: '00000000-0000-0000-0000-000000000003',
+          isi_komentar: 'Setuju banget! Tetap semangat ya buat semuanya!',
+          created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString()
+        }
+      ];
+      try {
+        localStorage.setItem('menfessinaja_comments_' + postId, JSON.stringify(commentsList));
+      } catch {}
+    }
     return {
       success: true,
-      data: {
-        comments: [
-          {
-            id: 'c-1',
-            post_id: path.split('/')[3],
-            konten: 'Semangat terus ya kak! Pasti bisa!',
-            created_at: new Date().toISOString()
-          }
-        ]
-      }
+      data: commentsList
     };
   }
 
   // 6. POST /api/posts/:id/comments
   if (path.includes('/comments') && method === 'POST') {
+    const postId = path.split('/')[3];
     const body = options.body ? JSON.parse(options.body) : {};
+    const text = body.isi_komentar || body.konten || '';
+    let commentsList: any[] = [];
+    try {
+      const raw = localStorage.getItem('menfessinaja_comments_' + postId);
+      if (raw) commentsList = JSON.parse(raw);
+    } catch {}
+    const newComment = {
+      id: 'c-' + Date.now(),
+      post_id: postId,
+      user_id: '00000000-0000-0000-0000-000000000002',
+      isi_komentar: text,
+      created_at: new Date().toISOString()
+    };
+    commentsList.push(newComment);
+    try {
+      localStorage.setItem('menfessinaja_comments_' + postId, JSON.stringify(commentsList));
+    } catch {}
+
+    // Update post comments_count
+    const posts = getStoredPosts();
+    const target = posts.find(p => p.id === postId);
+    if (target) {
+      target.comments_count = commentsList.length;
+      savePosts(posts);
+    }
+
     return {
       success: true,
-      data: {
-        comment: {
-          id: 'c-' + Date.now(),
-          post_id: path.split('/')[3],
-          konten: body.konten || '',
-          created_at: new Date().toISOString()
-        }
-      }
+      message: 'Komentar berhasil dikirim',
+      data: newComment
     };
   }
 

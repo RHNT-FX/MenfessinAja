@@ -99,7 +99,7 @@ const filteredFaqs = computed(() => {
 </script>
 
 <template>
-  <div class="flex items-start gap-8">
+  <div class="flex flex-col lg:flex-row items-start gap-6 lg:gap-8 w-full max-w-full">
     <!-- Left Sidebar -->
     <AppSidebar />
 

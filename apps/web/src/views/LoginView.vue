@@ -2,91 +2,93 @@
 import TurnstileWidget from '@/components/common/TurnstileWidget.vue';
 import { useAuthStore } from '@/stores/auth';
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Eye,
   EyeOff,
+  Lock,
+  Mail,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
 // Login state
-const loginEmail = ref('student@menfessinaja.ac.id');
-const loginPassword = ref('password123');
-const showLoginPassword = ref(false);
+const email = ref('student@menfessinaja.ac.id');
+const password = ref('password123');
+const showPassword = ref(false);
 const rememberMe = ref(true);
+const turnstileToken = ref('demo-turnstile-token');
+const isSubmitting = ref(false);
 const loginError = ref('');
-const loginTurnstileToken = ref('demo-turnstile-token');
 
-// Register state
-const regEmail = ref('');
-const regPassword = ref('');
-const regConfirmPassword = ref('');
-const showRegPassword = ref(false);
-const agreePolicy = ref(true);
-const regError = ref('');
-const regSuccess = ref('');
-const regTurnstileToken = ref('demo-turnstile-token');
+// Validation errors
+const emailError = computed(() => {
+  if (!email.value) return 'Email wajib diisi';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.value)) return 'Format email tidak valid (harus mengandung @ dan domain)';
+  return '';
+});
+
+const passwordError = computed(() => {
+  if (!password.value) return 'Kata sandi wajib diisi';
+  if (password.value.length < 6) return 'Kata sandi minimal 6 karakter';
+  return '';
+});
+
+const isFormValid = computed(() => {
+  return !emailError.value && !passwordError.value && Boolean(turnstileToken.value);
+});
 
 async function handleLogin() {
-  if (!loginEmail.value || !loginPassword.value) {
-    loginError.value = 'Silakan lengkapi email dan kata sandi';
+  if (emailError.value) {
+    loginError.value = emailError.value;
     return;
   }
-  if (!loginTurnstileToken.value) {
-    loginError.value = 'Silakan selesaikan verifikasi Cloudflare Turnstile';
+  if (passwordError.value) {
+    loginError.value = passwordError.value;
+    return;
+  }
+  if (!turnstileToken.value) {
+    loginError.value = 'Silakan selesaikan verifikasi Cloudflare Turnstile terlebih dahulu';
     return;
   }
   loginError.value = '';
+  isSubmitting.value = true;
 
   try {
-    const user = await authStore.login(loginEmail.value, loginPassword.value, loginTurnstileToken.value);
+    const user = await authStore.login(email.value, password.value, turnstileToken.value);
     if (user?.role === 'admin') {
       router.push('/admin');
     } else {
       router.push('/');
     }
   } catch (err: any) {
-    loginError.value = err.message || 'Login gagal';
+    loginError.value = err.message || 'Login gagal. Periksa kembali email dan kata sandi Anda.';
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
-async function handleRegister() {
-  if (!regEmail.value || !regPassword.value || !regConfirmPassword.value) {
-    regError.value = 'Semua kolom pendaftaran wajib diisi';
-    return;
+function setPreset(type: 'member' | 'admin') {
+  if (type === 'member') {
+    email.value = 'student@menfessinaja.ac.id';
+    password.value = 'password123';
+  } else {
+    email.value = 'admin@menfessinaja.ac.id';
+    password.value = 'password123';
   }
-  if (regPassword.value !== regConfirmPassword.value) {
-    regError.value = 'Konfirmasi kata sandi tidak cocok';
-    return;
-  }
-  if (!agreePolicy.value) {
-    regError.value = 'Anda harus menyetujui pedoman komunitas';
-    return;
-  }
-  if (!regTurnstileToken.value) {
-    regError.value = 'Silakan selesaikan verifikasi Cloudflare Turnstile';
-    return;
-  }
-  regError.value = '';
-
-  try {
-    await authStore.register(regEmail.value, regPassword.value, regTurnstileToken.value);
-    regSuccess.value = 'Akun berhasil dibuat! Mengalihkan ke beranda...';
-    setTimeout(() => {
-      router.push('/');
-    }, 1000);
-  } catch (err: any) {
-    regError.value = err.message || 'Pendaftaran gagal';
-  }
+  loginError.value = '';
 }
 </script>
 
 <template>
-  <div class="py-4 sm:py-6">
+  <div class="py-4 sm:py-8 max-w-5xl mx-auto px-4">
     <!-- Back to Feed Link -->
     <div class="mb-6">
       <router-link
@@ -94,253 +96,185 @@ async function handleRegister() {
         class="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
       >
         <ArrowLeft class="w-3.5 h-3.5" />
-        <span>Kembali ke papan cerita</span>
+        <span>Kembali ke linimasa utama</span>
       </router-link>
     </div>
 
-    <!-- 3-Column Layout (Sesuai Figma 11_Signin_Desktop.png) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      <!-- COLUMN 1: Editorial Branding & Values -->
-      <div class="lg:col-span-4 space-y-6">
+      <!-- Left Column: Branding / Philosophy (Sesuai Figma GUEH) -->
+      <div class="lg:col-span-5 space-y-6">
         <div>
-          <h1 class="font-serif text-3xl sm:text-4xl text-ink font-normal leading-tight">
+          <h1 class="font-serif text-3xl sm:text-4xl text-ink font-normal leading-tight mb-3">
             Satu akun.<br />Tetap anonim.
           </h1>
-          <p class="text-xs text-ink-muted mt-2 leading-relaxed">
-            Akun untuk menjaga ruang ini, bukan untuk memajang identitasmu.
+          <p class="text-xs sm:text-sm text-ink-muted leading-relaxed">
+            Akun digunakan untuk menjaga ruang ini tetap aman dan tertib, bukan untuk memajang identitasmu.
           </p>
         </div>
 
-        <!-- Cobalt Blue Card (Sesuai Figma) -->
-        <div class="bg-primary text-white p-6 sm:p-7 rounded-sm space-y-4 shadow-sm">
-          <span class="font-serif text-5xl leading-none block select-none opacity-80 font-normal">“</span>
-          <h2 class="font-serif text-xl sm:text-2xl font-normal leading-snug">
-            Di sini, ceritamu yang dikenal. Bukan namamu.
-          </h2>
-          <p class="text-xs text-blue-100 leading-relaxed font-light">
-            Identitas asli tidak tampil di feed. Namun, admin tetap dapat meninjau dan memblokir akun yang melanggar pedoman. Anonim bukan berarti bebas menyakiti.
+        <!-- Quote Box Editorial Style -->
+        <div class="p-5 bg-surface border-l-4 border-primary text-ink text-xs sm:text-sm leading-relaxed rounded-r-sm space-y-2.5 shadow-xs">
+          <p class="font-serif italic text-ink">
+            "Di sini, ceritamu yang dikenal. Bukan namamu."
           </p>
-          <router-link to="/pedoman" class="inline-flex items-center gap-1 text-xs font-semibold text-white underline hover:text-blue-100">
-            <span>Kenali batasnya</span>
-            <span>↗</span>
-          </router-link>
+          <p class="text-[11px] text-ink-muted">
+            Identitas asli tidak tampil di feed publik. Tim moderator hanya meninjau akun jika melanggar pedoman komunitas.
+          </p>
         </div>
 
-        <!-- Quick Demo Hint -->
-        <div class="p-3 bg-surface border border-border text-xs text-ink space-y-1.5 rounded-sm">
-          <div class="font-bold text-ink-muted text-[11px] uppercase tracking-wider">Kredensial Demo:</div>
-          <div class="flex flex-wrap gap-2 text-[11px]">
+        <!-- Demo Account Presets -->
+        <div class="p-4 bg-surface border border-border rounded-sm space-y-2.5 text-xs">
+          <span class="font-bold text-ink-muted text-[11px] uppercase tracking-wider block">
+            Kredensial Demo Cepat:
+          </span>
+          <div class="grid grid-cols-2 gap-2">
             <button
-              @click="loginEmail = 'student@menfessinaja.ac.id'; loginPassword = 'password123'"
-              class="px-2 py-1 bg-canvas hover:bg-surface-muted border border-border rounded-xs font-medium"
+              type="button"
+              @click="setPreset('member')"
+              class="px-2.5 py-2 border rounded-xs text-left transition-all hover:border-primary active:scale-98"
+              :class="email.includes('student') ? 'bg-primary-soft border-primary text-primary font-bold' : 'bg-canvas border-border text-ink'"
             >
-              Member: student@...
+              <div class="font-bold text-[11px] flex items-center gap-1">
+                <UserCheck class="w-3 h-3 text-primary" />
+                <span>Akun Member</span>
+              </div>
+              <div class="text-[10px] text-ink-muted truncate">student@...</div>
             </button>
+
             <button
-              @click="loginEmail = 'admin@menfessinaja.ac.id'; loginPassword = 'password123'"
-              class="px-2 py-1 bg-canvas hover:bg-surface-muted border border-border rounded-xs font-medium"
+              type="button"
+              @click="setPreset('admin')"
+              class="px-2.5 py-2 border rounded-xs text-left transition-all hover:border-primary active:scale-98"
+              :class="email.includes('admin') ? 'bg-primary-soft border-primary text-primary font-bold' : 'bg-canvas border-border text-ink'"
             >
-              Admin: admin@...
+              <div class="font-bold text-[11px] flex items-center gap-1">
+                <ShieldCheck class="w-3 h-3 text-primary" />
+                <span>Akun Admin</span>
+              </div>
+              <div class="text-[10px] text-ink-muted truncate">admin@...</div>
             </button>
           </div>
-        </div>
-
-        <div class="text-xs text-ink-muted">
-          Kesulitan masuk? <router-link to="/bantuan" class="text-ink hover:underline font-semibold">Bantuan & FAQ ↗</router-link>
+          <p class="text-[10px] text-ink-muted">Kata sandi: <span class="font-mono font-bold">password123</span></p>
         </div>
       </div>
 
-      <!-- COLUMN 2: Sign In Form (Udah punya akun?) -->
-      <div class="lg:col-span-4 bg-canvas space-y-4">
-        <div class="border-t-2 border-ink pt-3">
+      <!-- Right Column: Dedicated Login Form Card -->
+      <div class="lg:col-span-7 bg-surface border border-border p-6 sm:p-8 rounded-sm shadow-xs space-y-5">
+        <div>
+          <div class="text-[11px] font-bold text-primary uppercase tracking-wider mb-1">
+            Autentikasi Pengguna
+          </div>
           <h2 class="font-serif text-2xl text-ink font-normal">
-            Udah punya akun?
+            Masuk ke Akun
           </h2>
           <p class="text-xs text-ink-muted mt-1">
-            Masuk, lalu lanjutkan obrolannya.
+            Silakan masukkan kredensial kampusmu untuk melanjutkan obrolan.
           </p>
         </div>
 
-        <div v-if="loginError" class="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-sm">
-          {{ loginError }}
+        <!-- Alert Error Banner -->
+        <div v-if="loginError" class="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm flex items-start gap-2">
+          <AlertCircle class="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+          <span>{{ loginError }}</span>
         </div>
 
-        <form @submit.prevent="handleLogin" class="space-y-3.5 text-xs">
+        <form @submit.prevent="handleLogin" class="space-y-4 text-xs">
           <!-- Email Input -->
           <div>
-            <label class="block font-semibold text-ink mb-1">Email</label>
-            <input
-              v-model="loginEmail"
-              type="email"
-              required
-              placeholder="kamu@example.com"
-              class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-medium"
-            />
-            <p class="text-[10px] text-ink-muted mt-1">
-              Email hanya untuk akun, tidak tampil di Menfess.
+            <label class="block font-semibold text-ink mb-1">
+              Alamat Email Kampus / Pribadi *
+            </label>
+            <div class="relative">
+              <Mail class="w-4 h-4 absolute left-3 top-3 text-ink-muted" />
+              <input
+                v-model="email"
+                type="email"
+                required
+                placeholder="nama@kampus.ac.id"
+                class="w-full pl-9 pr-3 py-2.5 bg-canvas border rounded-sm focus:outline-none transition-colors"
+                :class="email && emailError ? 'border-red-400 focus:border-red-500' : 'border-border focus:border-ink'"
+              />
+            </div>
+            <p v-if="email && emailError" class="text-[11px] text-red-600 mt-1">
+              {{ emailError }}
             </p>
           </div>
 
           <!-- Password Input -->
           <div>
-            <label class="block font-semibold text-ink mb-1">Kata sandi</label>
-            <div class="relative">
-              <input
-                v-model="loginPassword"
-                :type="showLoginPassword ? 'text' : 'password'"
-                required
-                class="w-full p-2.5 pr-9 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono"
-              />
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-semibold text-ink">Kata Sandi *</label>
               <button
                 type="button"
-                @click="showLoginPassword = !showLoginPassword"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
+                @click="showPassword = !showPassword"
+                class="text-[11px] text-primary hover:underline flex items-center gap-1"
               >
-                <EyeOff v-if="showLoginPassword" class="w-4 h-4" />
-                <Eye v-else class="w-4 h-4" />
+                <EyeOff v-if="showPassword" class="w-3.5 h-3.5" />
+                <Eye v-else class="w-3.5 h-3.5" />
+                <span>{{ showPassword ? 'Sembunyikan' : 'Lihat' }}</span>
               </button>
             </div>
+            <div class="relative">
+              <Lock class="w-4 h-4 absolute left-3 top-3 text-ink-muted" />
+              <input
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                placeholder="Minimal 6 karakter"
+                class="w-full pl-9 pr-3 py-2.5 bg-canvas border rounded-sm focus:outline-none transition-colors"
+                :class="password && passwordError ? 'border-red-400 focus:border-red-500' : 'border-border focus:border-ink'"
+              />
+            </div>
+            <p v-if="password && passwordError" class="text-[11px] text-red-600 mt-1">
+              {{ passwordError }}
+            </p>
           </div>
 
-          <!-- Remember & Forgot -->
+          <!-- Remember Me Checkbox -->
           <div class="flex items-center justify-between text-xs pt-1">
-            <label class="flex items-center gap-2 cursor-pointer text-ink select-none">
-              <input v-model="rememberMe" type="checkbox" class="accent-primary" />
-              <span>Ingat saya</span>
+            <label class="flex items-center gap-2 cursor-pointer select-none text-ink">
+              <input v-model="rememberMe" type="checkbox" class="accent-primary rounded-xs" />
+              <span>Ingat saya di perangkat ini</span>
             </label>
-            <router-link to="/bantuan" class="text-primary hover:underline text-[11px]">
+            <router-link to="/bantuan" class="text-ink-muted hover:text-primary transition-colors text-[11px]">
               Lupa kata sandi?
             </router-link>
           </div>
 
-          <!-- Cloudflare Turnstile Verification Widget -->
-          <TurnstileWidget v-model="loginTurnstileToken" />
+          <!-- Cloudflare Turnstile Human-Check -->
+          <div class="pt-2">
+            <label class="block font-semibold text-ink mb-1.5 text-[11px]">
+              Verifikasi Keamanan Manusia (Anti-Bot Cloudflare)
+            </label>
+            <TurnstileWidget v-model="turnstileToken" />
+          </div>
 
-          <!-- Login Button -->
-          <button
-            type="submit"
-            :disabled="authStore.isLoading"
-            class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs"
-          >
-            <span>Masuk ke Akun</span>
-            <ArrowRight class="w-3.5 h-3.5" />
-          </button>
-
-          <p class="text-[10px] text-ink-muted leading-normal">
-            Isi email dan kata sandi, lalu selesaikan verifikasi manusia. Form ini terkoneksi ke backend Hono.
-          </p>
-
-          <!-- Guest Callout Box (Sesuai Figma) -->
-          <div class="p-3.5 bg-primary-soft text-xs text-ink leading-relaxed rounded-xs border-l-2 border-primary mt-4">
-            <span class="font-bold text-primary block mb-0.5">Cuma mau baca? Boleh.</span>
-            Feed, komentar, pencarian barang, dan Lost & Found bisa dibaca tanpa masuk.
-            <router-link to="/" class="font-semibold text-primary hover:underline block mt-1">
-              Lanjut sebagai tamu ↗
-            </router-link>
+          <!-- Submit Button -->
+          <div class="pt-2">
+            <button
+              type="submit"
+              :disabled="!isFormValid || isSubmitting"
+              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold py-3 px-4 rounded-sm transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <span>{{ isSubmitting ? 'Memproses Masuk...' : 'Masuk ke Akun' }}</span>
+              <ArrowRight class="w-3.5 h-3.5" />
+            </button>
           </div>
         </form>
-      </div>
 
-      <!-- COLUMN 3: Register Form (Baru di sini?) -->
-      <div class="lg:col-span-4 bg-canvas space-y-4">
-        <div class="border-t-2 border-ink pt-3">
-          <h2 class="font-serif text-2xl text-ink font-normal">
-            Baru di sini?
-          </h2>
-          <p class="text-xs text-ink-muted mt-1">
-            Bikin akun untuk menulis, membalas, dan saling bantu.
+        <!-- Switch to Register Screen Banner -->
+        <div class="border-t border-border pt-4 text-center text-xs text-ink-muted space-y-2">
+          <p>
+            Belum memiliki akun di Menfessin Aja?
           </p>
-        </div>
-
-        <div v-if="regError" class="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-sm">
-          {{ regError }}
-        </div>
-        <div v-if="regSuccess" class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-sm">
-          {{ regSuccess }}
-        </div>
-
-        <form @submit.prevent="handleRegister" class="space-y-3.5 text-xs">
-          <!-- Email Input -->
-          <div>
-            <label class="block font-semibold text-ink mb-1">Email *</label>
-            <input
-              v-model="regEmail"
-              type="email"
-              required
-              placeholder="Alamat email kamu"
-              class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-medium"
-            />
-            <p class="text-[10px] text-ink-muted mt-1">
-              Gunakan email aktif untuk pemulihan akun.
-            </p>
-          </div>
-
-          <!-- Password Input -->
-          <div>
-            <label class="block font-semibold text-ink mb-1">Buat kata sandi *</label>
-            <div class="relative">
-              <input
-                v-model="regPassword"
-                :type="showRegPassword ? 'text' : 'password'"
-                required
-                placeholder="Minimal 8 karakter"
-                class="w-full p-2.5 pr-9 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono"
-              />
-              <button
-                type="button"
-                @click="showRegPassword = !showRegPassword"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
-              >
-                <EyeOff v-if="showRegPassword" class="w-4 h-4" />
-                <Eye v-else class="w-4 h-4" />
-              </button>
-            </div>
-            <p class="text-[10px] text-ink-muted mt-1">
-              Gunakan kombinasi huruf dan angka.
-            </p>
-          </div>
-
-          <!-- Confirm Password Input -->
-          <div>
-            <label class="block font-semibold text-ink mb-1">Ulangi kata sandi *</label>
-            <input
-              v-model="regConfirmPassword"
-              type="password"
-              required
-              placeholder="Ketik ulang kata sandi"
-              class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono"
-            />
-          </div>
-
-          <!-- Terms Checkbox -->
-          <label class="flex items-start gap-2 cursor-pointer text-xs text-ink leading-snug select-none pt-1">
-            <input v-model="agreePolicy" type="checkbox" class="accent-primary mt-0.5" />
-            <span>
-              Saya setuju dengan 
-              <router-link to="/pedoman" target="_blank" class="text-primary underline">Pedoman Komunitas</router-link> 
-              dan 
-              <router-link to="/privasi" target="_blank" class="text-primary underline">Kebijakan Privasi</router-link> 
-              Menfessin Aja.
-            </span>
-          </label>
-
-          <!-- Cloudflare Turnstile Verification Widget -->
-          <TurnstileWidget v-model="regTurnstileToken" />
-
-          <!-- Register Button -->
-          <button
-            type="submit"
-            :disabled="authStore.isLoading"
-            class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs"
+          <router-link
+            to="/register"
+            class="inline-flex items-center gap-1.5 font-bold text-primary hover:underline"
           >
-            <span>Buat akun</span>
+            <span>Daftar akun baru di sini</span>
             <ArrowRight class="w-3.5 h-3.5" />
-          </button>
-
-          <p class="text-[10px] text-ink-muted leading-normal">
-            Semua kolom wajib diisi. Kata sandi harus sama. Pendaftaran tidak meminta nama asli, nomor HP, atau NIM.
-          </p>
-        </form>
+          </router-link>
+        </div>
       </div>
     </div>
   </div>
