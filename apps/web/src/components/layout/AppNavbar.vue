@@ -17,7 +17,7 @@ function handleLogout() {
 
 <template>
   <header class="w-full bg-canvas border-b border-border sticky top-0 z-40">
-    <div class="max-w-[1360px] mx-auto px-4 sm:px-8 h-20 flex items-center justify-between gap-6">
+    <div class="w-full px-4 sm:px-8 lg:px-12 h-20 flex items-center justify-between gap-6">
       <!-- Logo & Brand Header -->
       <div class="flex items-center gap-4">
         <router-link to="/" class="flex flex-col text-left group">
@@ -31,7 +31,7 @@ function handleLogout() {
       </div>
 
       <!-- Center Search Bar (Sesuai Figma) -->
-      <div class="hidden md:flex flex-1 max-w-md">
+      <div class="hidden md:flex flex-1 max-w-xl mx-auto">
         <div class="relative w-full">
           <Search class="w-4 h-4 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input

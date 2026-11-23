@@ -16,13 +16,13 @@ onMounted(() => {
     <AppNavbar />
 
     <!-- Main Content Area -->
-    <main class="flex-1 w-full max-w-[1360px] mx-auto px-4 sm:px-8 py-6 sm:py-8">
+    <main class="flex-1 w-full px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
       <router-view />
     </main>
 
     <!-- Footer (Sesuai Figma) -->
     <footer class="border-t border-border bg-canvas py-8 text-xs text-ink-muted">
-      <div class="max-w-[1360px] mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="w-full px-4 sm:px-8 lg:px-12 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p class="font-medium">Menfessin Aja. © 2026</p>
         <div class="flex items-center gap-4 text-ink-muted">
           <router-link to="/privasi" class="hover:text-ink transition-colors">Privasi</router-link>

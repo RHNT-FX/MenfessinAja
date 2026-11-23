@@ -104,7 +104,7 @@ const filteredFaqs = computed(() => {
     <AppSidebar />
 
     <!-- Main Content Area -->
-    <div class="flex-1 min-w-0 max-w-3xl">
+    <div class="flex-1 min-w-0 w-full max-w-4xl">
       <!-- Header Section -->
       <div class="mb-6">
         <div class="text-[11px] font-semibold text-ink-muted tracking-wider uppercase mb-1">
