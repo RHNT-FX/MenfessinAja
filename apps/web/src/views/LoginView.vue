@@ -44,7 +44,7 @@ async function handleLogin() {
 
   try {
     const user = await authStore.login(loginEmail.value, loginPassword.value, loginTurnstileToken.value);
-    if (user.role === 'admin') {
+    if (user?.role === 'admin') {
       router.push('/admin');
     } else {
       router.push('/');

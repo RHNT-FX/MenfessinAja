@@ -96,6 +96,67 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
   const method = (options.method || 'GET').toUpperCase();
   const path = endpoint.split('?')[0];
 
+  // 0. POST /api/auth/login
+  if (path === '/api/auth/login' && method === 'POST') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    const email = (body.email || '').toLowerCase().trim();
+    const isAdmin = email.includes('admin');
+    const user = {
+      id: isAdmin ? '00000000-0000-0000-0000-000000000001' : '00000000-0000-0000-0000-000000000002',
+      email: email || 'student@menfessinaja.ac.id',
+      role: isAdmin ? 'admin' : 'member',
+      status: 'active',
+      created_at: new Date().toISOString()
+    };
+    return {
+      success: true,
+      message: 'Login berhasil',
+      data: {
+        user,
+        token: 'demo-token-' + (isAdmin ? 'admin' : 'member')
+      }
+    };
+  }
+
+  // 0.1 POST /api/auth/register
+  if (path === '/api/auth/register' && method === 'POST') {
+    const body = options.body ? JSON.parse(options.body) : {};
+    const email = (body.email || '').toLowerCase().trim();
+    const user = {
+      id: 'user-' + Date.now(),
+      email: email || 'student@menfessinaja.ac.id',
+      role: 'member',
+      status: 'active',
+      created_at: new Date().toISOString()
+    };
+    return {
+      success: true,
+      message: 'Registrasi berhasil',
+      data: {
+        user,
+        token: 'demo-token-member'
+      }
+    };
+  }
+
+  // 0.2 GET /api/auth/me
+  if (path === '/api/auth/me' && method === 'GET') {
+    let user = {
+      id: '00000000-0000-0000-0000-000000000002',
+      email: 'student@menfessinaja.ac.id',
+      role: 'member',
+      status: 'active'
+    };
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) user = JSON.parse(raw);
+    } catch {}
+    return {
+      success: true,
+      data: { user }
+    };
+  }
+
   // 1. GET /api/posts
   if (path === '/api/posts' && method === 'GET') {
     const posts = getStoredPosts();
