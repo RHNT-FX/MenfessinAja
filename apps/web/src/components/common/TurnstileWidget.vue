@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check, Loader2, RefreshCw, ShieldCheck } from 'lucide-vue-next';
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -11,11 +11,14 @@ const props = withDefaults(
   }>(),
   {
     modelValue: '',
-    siteKey: '1x00000000000000000000AA',
+    siteKey: '',
     autoVerify: false,
     label: 'Verifikasi bahwa Anda adalah manusia'
   }
 );
+
+const envSiteKey = (import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY as string) || '';
+const effectiveSiteKey = computed(() => props.siteKey || envSiteKey || '1x00000000000000000000AA');
 
 const emit = defineEmits<{
   (e: 'update:modelValue', token: string): void;
@@ -48,7 +51,7 @@ function initTurnstile() {
     try {
       isNativeTurnstileActive.value = true;
       widgetId.value = (window as any).turnstile.render(containerRef.value, {
-        sitekey: props.siteKey || '1x00000000000000000000AA',
+        sitekey: effectiveSiteKey.value,
         callback: (token: string) => {
           isVerified.value = true;
           isVerifying.value = false;

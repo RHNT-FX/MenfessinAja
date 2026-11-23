@@ -250,7 +250,9 @@ const displayedPosts = computed(() => {
     list.sort((a, b) => {
       if (a.is_boosted && !b.is_boosted) return -1;
       if (!a.is_boosted && b.is_boosted) return 1;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const timeB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      const timeA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
   }
 
@@ -324,10 +326,13 @@ async function handleSubmitPost() {
       }, 2000);
     } else {
       if (res.data) {
-        posts.value.unshift({
-          ...res.data,
-          comments_count: 0
-        });
+        const postObj = (res.data as any).post || res.data;
+        if (postObj && postObj.id) {
+          posts.value.unshift({
+            ...postObj,
+            comments_count: postObj.comments_count || 0
+          });
+        }
       }
 
       // Jika memilih Superchat/Pinned Post, lakukan checkout Snap QRIS
@@ -446,8 +451,10 @@ async function submitComment() {
   }
 }
 
-function formatRelativeTime(dateStr: string): string {
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return 'Baru saja';
   const diff = Date.now() - new Date(dateStr).getTime();
+  if (isNaN(diff)) return 'Baru saja';
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return 'Baru saja';
   if (minutes < 60) return `${minutes} menit lalu`;

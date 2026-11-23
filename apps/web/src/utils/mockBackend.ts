@@ -80,7 +80,17 @@ const initialPosts: MockPost[] = [
 function getStoredPosts(): MockPost[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_POSTS);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((item: any) => {
+          if (item && item.post && item.post.id) {
+            return { ...item.post, ...item };
+          }
+          return item;
+        }).filter((item: any) => item && item.id && item.teks_konten);
+      }
+    }
   } catch {}
   localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(initialPosts));
   return [...initialPosts];
@@ -206,7 +216,10 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
     return {
       success: true,
       message: 'Menfess berhasil diterbitkan',
-      data: { post: newPost }
+      data: {
+        ...newPost,
+        post: newPost
+      }
     };
   }
 
