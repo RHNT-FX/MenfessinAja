@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import AppSidebar from '@/components/layout/AppSidebar.vue';
+import TurnstileWidget from '@/components/common/TurnstileWidget.vue';
 import { useAuthStore } from '@/stores/auth';
 import { apiFetch } from '@/utils/api';
+import { compressImageToWebp } from '@/utils/imageCompressor';
 import type { Comment } from '@menfessin-aja/shared';
 import {
   AlertTriangle,
@@ -12,11 +14,12 @@ import {
   MessageSquare,
   QrCode,
   Send,
-  ShieldCheck,
   Sparkles,
-  X
+  Wand2,
+  X,
+  Zap
 } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 interface FeedPost {
@@ -56,6 +59,144 @@ const teksKonten = ref('');
 const isSuperchatSelected = ref(false);
 const isSubmitting = ref(false);
 const composeResult = ref<{ success: boolean; flagged?: boolean; message: string } | null>(null);
+const turnstileToken = ref('demo-turnstile-token');
+
+// Live AI & Privacy Moderation Inspector
+interface AiPreviewData {
+  sanitizedText: string;
+  nimMaskedCount: number;
+  phoneMaskedCount: number;
+  aiScore: number;
+  isSafe: boolean;
+  status: 'approved' | 'flagged';
+  flags: string[];
+  reason?: string;
+}
+
+const aiPreview = ref<AiPreviewData | null>(null);
+const isCheckingAi = ref(false);
+let debounceTimer: any = null;
+
+watch(teksKonten, (newVal) => {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  if (!newVal || newVal.trim().length < 4) {
+    aiPreview.value = null;
+    return;
+  }
+  debounceTimer = setTimeout(() => {
+    checkAiModeration();
+  }, 350);
+});
+
+async function checkAiModeration() {
+  if (!teksKonten.value.trim()) return;
+  isCheckingAi.value = true;
+  try {
+    const res = await apiFetch('/api/posts/preview-moderation', {
+      method: 'POST',
+      body: JSON.stringify({ teks_konten: teksKonten.value })
+    });
+    if (res.success && res.data) {
+      aiPreview.value = res.data;
+    }
+  } catch (err) {
+    console.error('Gagal evaluasi AI:', err);
+  } finally {
+    isCheckingAi.value = false;
+  }
+}
+
+function applyPreset(type: 'safe' | 'doxxing' | 'toxic') {
+  if (type === 'safe') {
+    teksKonten.value = 'Semangat teman-teman yang besok ada presentasi tugas akhir di lab! Semoga semua kelompok dapat nilai A.';
+    kategori.value = 'Akademik';
+  } else if (type === 'doxxing') {
+    teksKonten.value = 'Ada dompet tertinggal di kantin barat. Pemiliknya tolong hubungi nomor 081234567890 atau langsung cari mahasiswa NIM 11241059 di perpustakaan.';
+    kategori.value = 'Info kampus';
+  } else if (type === 'toxic') {
+    teksKonten.value = 'Dasar bajingan tolol, awas aja kalo ketemu di parkiran bakal kuhajar kamu!';
+    kategori.value = 'Curhat';
+  }
+}
+
+// Midtrans Snap QRIS Checkout & Payment State (Sprint 4)
+interface CheckoutState {
+  orderId: string;
+  token: string;
+  redirectUrl: string;
+  grossAmount: number;
+  status: 'pending' | 'settlement' | 'expire';
+  postId: string;
+}
+
+const activeCheckout = ref<CheckoutState | null>(null);
+const isPaying = ref(false);
+
+async function handleSimulatePayment() {
+  if (!activeCheckout.value) return;
+  isPaying.value = true;
+  try {
+    const res = await apiFetch(`/api/transactions/${activeCheckout.value.orderId}/simulate`, {
+      method: 'POST'
+    });
+    if (res.success) {
+      activeCheckout.value.status = 'settlement';
+      // Tandai postingan sebagai boosted di linimasa
+      const targetPost = posts.value.find((p) => p.id === activeCheckout.value?.postId);
+      if (targetPost) {
+        targetPost.is_boosted = true;
+      }
+      setTimeout(() => {
+        isCreateOpen.value = false;
+        activeCheckout.value = null;
+        teksKonten.value = '';
+        removeImage();
+      }, 1500);
+    }
+  } catch (err: any) {
+    alert(err.message || 'Gagal simulasi pembayaran');
+  } finally {
+    isPaying.value = false;
+  }
+}
+
+// WebP image compression state (SRS 1.3.3 & NFR-001)
+const imagePreview = ref('');
+const imageCompressionInfo = ref<{ originalKb: number; compressedKb: number; reduction: number } | null>(null);
+const isCompressing = ref(false);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+function triggerFileInput() {
+  fileInputRef.value?.click();
+}
+
+async function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (!target.files || target.files.length === 0) return;
+  const file = target.files[0];
+  isCompressing.value = true;
+  try {
+    const res = await compressImageToWebp(file, 100);
+    imagePreview.value = res.dataUrl;
+    imageCompressionInfo.value = {
+      originalKb: res.originalSizeKb,
+      compressedKb: res.compressedSizeKb,
+      reduction: res.reductionPercentage
+    };
+  } catch (err: any) {
+    alert(err.message || 'Gagal mengompresi gambar');
+  } finally {
+    isCompressing.value = false;
+  }
+}
+
+function removeImage() {
+  imagePreview.value = '';
+  imageCompressionInfo.value = null;
+  if (fileInputRef.value) {
+    fileInputRef.value.value = '';
+  }
+}
 
 // Comments modal / drawer state
 const isCommentsOpen = ref(false);
@@ -127,6 +268,9 @@ function handleOpenCreate() {
   }
   isCreateOpen.value = true;
   composeResult.value = null;
+  aiPreview.value = null;
+  activeCheckout.value = null;
+  removeImage();
 }
 
 async function handleVote(post: FeedPost, direction: 'up' | 'down') {
@@ -160,6 +304,7 @@ async function handleSubmitPost() {
       method: 'POST',
       body: JSON.stringify({
         teks_konten: teksKonten.value,
+        media_url: imagePreview.value || undefined,
         category_pill: kategori.value,
         is_superchat: isSuperchatSelected.value
       })
@@ -171,25 +316,77 @@ async function handleSubmitPost() {
         flagged: true,
         message: 'Konten Anda memerlukan peninjauan oleh tim moderasi dan telah masuk antrean admin.'
       };
+      setTimeout(() => {
+        isCreateOpen.value = false;
+        teksKonten.value = '';
+        removeImage();
+        composeResult.value = null;
+      }, 2000);
     } else {
-      composeResult.value = {
-        success: true,
-        flagged: false,
-        message: 'Menfess berhasil dikirim dan ditayangkan!'
-      };
       if (res.data) {
         posts.value.unshift({
           ...res.data,
           comments_count: 0
         });
       }
-    }
 
-    setTimeout(() => {
-      isCreateOpen.value = false;
-      teksKonten.value = '';
-      composeResult.value = null;
-    }, 1800);
+      // Jika memilih Superchat/Pinned Post, lakukan checkout Snap QRIS
+      if (isSuperchatSelected.value && res.data?.id) {
+        try {
+          const checkoutRes = await apiFetch('/api/transactions/checkout', {
+            method: 'POST',
+            body: JSON.stringify({
+              post_id: res.data.id,
+              feature_type: 'superchat',
+              gross_amount: 5000
+            })
+          });
+
+          if (checkoutRes.success && checkoutRes.data) {
+            activeCheckout.value = {
+              orderId: checkoutRes.data.orderId,
+              token: checkoutRes.data.token,
+              redirectUrl: checkoutRes.data.redirectUrl,
+              grossAmount: checkoutRes.data.grossAmount,
+              status: 'pending',
+              postId: res.data.id
+            };
+
+            composeResult.value = {
+              success: true,
+              flagged: false,
+              message: 'Menfess terbit! Selesaikan pembayaran QRIS di samping untuk menyematkan ke urutan teratas.'
+            };
+
+            if (typeof window !== 'undefined' && (window as any).snap && !checkoutRes.data.isMock) {
+              (window as any).snap.pay(checkoutRes.data.token, {
+                onSuccess: () => {
+                  if (activeCheckout.value) activeCheckout.value.status = 'settlement';
+                  const p = posts.value.find((item) => item.id === res.data.id);
+                  if (p) p.is_boosted = true;
+                }
+              });
+            }
+            return;
+          }
+        } catch (checkoutErr: any) {
+          console.warn('Gagal checkout superchat:', checkoutErr);
+        }
+      }
+
+      composeResult.value = {
+        success: true,
+        flagged: false,
+        message: 'Menfess berhasil dikirim dan ditayangkan!'
+      };
+
+      setTimeout(() => {
+        isCreateOpen.value = false;
+        teksKonten.value = '';
+        removeImage();
+        composeResult.value = null;
+      }, 1800);
+    }
   } catch (err: any) {
     composeResult.value = {
       success: false,
@@ -360,6 +557,11 @@ function formatRelativeTime(dateStr: string): string {
             {{ post.teks_konten }}
           </p>
 
+          <!-- Post Media / Image (WebP) -->
+          <div v-if="post.media_url" class="my-3 rounded-sm overflow-hidden border border-border max-h-96">
+            <img :src="post.media_url" alt="Media menfess" class="w-full h-auto max-h-96 object-cover" />
+          </div>
+
           <!-- Interaction Bar (Sesuai Figma) -->
           <div class="flex items-center justify-between pt-3 mt-2 border-t border-border/40 text-xs">
             <div class="flex items-center gap-3">
@@ -477,19 +679,134 @@ function formatRelativeTime(dateStr: string): string {
               <p class="text-[10px] text-ink-muted mt-1">
                 Wajib diisi. Format NIM dan nomor telepon seluler akan otomatis disamarkan demi privasi.
               </p>
+
+              <!-- Quick Demo Preset Buttons for Live Presentation -->
+              <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                <span class="text-[10px] text-ink-muted font-semibold">Uji Demo Cepat:</span>
+                <button
+                  type="button"
+                  @click="applyPreset('safe')"
+                  class="px-2 py-0.5 bg-surface border border-border hover:border-emerald-600 text-[10px] rounded-xs text-ink transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Isi contoh menfess wajar yang lolos otomatis"
+                >
+                  <span class="text-emerald-700 font-bold">✓</span>
+                  <span>Cerita Wajar</span>
+                </button>
+                <button
+                  type="button"
+                  @click="applyPreset('doxxing')"
+                  class="px-2 py-0.5 bg-surface border border-border hover:border-primary text-[10px] rounded-xs text-ink transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Isi contoh teks yang memuat NIM dan Nomor HP"
+                >
+                  <span class="text-primary font-bold">🔒</span>
+                  <span>Doxxing NIM & HP</span>
+                </button>
+                <button
+                  type="button"
+                  @click="applyPreset('toxic')"
+                  class="px-2 py-0.5 bg-surface border border-border hover:border-red-600 text-[10px] rounded-xs text-ink transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Isi contoh ujaran kebencian / makian kasar"
+                >
+                  <span class="text-red-700 font-bold">⚠️</span>
+                  <span>Ujaran Kasar (Flagged)</span>
+                </button>
+              </div>
+
+              <!-- Live AI NLP & Privacy Moderation Inspector -->
+              <div
+                v-if="aiPreview || isCheckingAi"
+                class="mt-2.5 p-3 rounded-sm border transition-all text-xs"
+                :class="aiPreview?.isSafe ? 'bg-emerald-50/50 border-emerald-300' : 'bg-amber-50/70 border-amber-300'"
+              >
+                <div class="flex items-center justify-between font-semibold mb-1.5">
+                  <div class="flex items-center gap-1.5">
+                    <Wand2 class="w-3.5 h-3.5" :class="aiPreview?.isSafe ? 'text-emerald-700' : 'text-amber-700'" />
+                    <span class="text-[11px] font-bold text-ink">Inspeksi AI NLP & Privasi</span>
+                    <Loader2 v-if="isCheckingAi" class="w-3 h-3 animate-spin text-primary ml-1" />
+                  </div>
+                  <span
+                    v-if="aiPreview"
+                    class="px-2 py-0.5 rounded-xs text-[10px] font-bold uppercase tracking-wider"
+                    :class="aiPreview.isSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'"
+                  >
+                    {{ aiPreview.isSafe ? 'Lolos Otomatis' : 'Tertahan (Flagged)' }}
+                  </span>
+                </div>
+
+                <div v-if="aiPreview" class="space-y-1.5 text-[11px]">
+                  <div class="flex items-center justify-between text-ink">
+                    <span>Skor Probabilitas AI:</span>
+                    <span class="font-mono font-bold" :class="aiPreview.aiScore >= 0.70 ? 'text-red-700' : 'text-emerald-700'">
+                      {{ aiPreview.aiScore.toFixed(2) }} / 1.00 {{ aiPreview.aiScore >= 0.70 ? '(≥ 0.70 Ambang Flagged)' : '(< 0.70 Aman)' }}
+                    </span>
+                  </div>
+
+                  <!-- Progress Bar Skala Skor AI -->
+                  <div class="w-full bg-border/60 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      class="h-full transition-all duration-300 rounded-full"
+                      :class="aiPreview.aiScore >= 0.70 ? 'bg-red-600' : 'bg-emerald-600'"
+                      :style="{ width: `${Math.min(100, Math.max(5, aiPreview.aiScore * 100))}%` }"
+                    ></div>
+                  </div>
+
+                  <!-- Sanitasi Preview Info -->
+                  <div v-if="aiPreview.nimMaskedCount > 0 || aiPreview.phoneMaskedCount > 0" class="pt-1 text-emerald-800 font-medium flex items-center gap-1">
+                    <CheckCircle2 class="w-3.5 h-3.5 shrink-0 text-emerald-700" />
+                    <span>Data pribadi tersanitasi: {{ aiPreview.nimMaskedCount }} NIM & {{ aiPreview.phoneMaskedCount }} No. HP disamarkan.</span>
+                  </div>
+
+                  <!-- Reason / Flag Info -->
+                  <div v-if="aiPreview.reason" class="text-amber-900 font-medium">
+                    {{ aiPreview.reason }}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <!-- Tambahkan Foto Button -->
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface border border-border text-xs font-semibold text-ink hover:bg-surface-muted rounded-sm transition-colors"
-            >
-              <ImageIcon class="w-3.5 h-3.5" />
-              <span>Tambahkan foto</span>
-            </button>
-            <p class="text-[10px] text-ink-muted">
-              Opsional. Foto dikompresi otomatis ke WebP ≤100 KB per berkas.
-            </p>
+            <!-- Tambahkan Foto Section (SRS 1.3.3 & NFR-001: WebP ≤100 KB) -->
+            <div>
+              <input
+                ref="fileInputRef"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="handleFileSelect"
+              />
+
+              <!-- Preview Image jika sudah dipilih -->
+              <div v-if="imagePreview" class="relative w-full h-40 bg-canvas border border-border rounded-sm overflow-hidden mb-2">
+                <img :src="imagePreview" alt="Preview WebP" class="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  @click="removeImage"
+                  class="absolute top-2 right-2 p-1 bg-black/70 text-white rounded-full hover:bg-black transition-colors"
+                  title="Hapus foto"
+                >
+                  <X class="w-3.5 h-3.5" />
+                </button>
+                <div v-if="imageCompressionInfo" class="absolute bottom-2 left-2 px-2 py-0.5 bg-emerald-700 text-white text-[10px] font-bold rounded-xs shadow-xs">
+                  ✓ WebP • {{ imageCompressionInfo.compressedKb }} KB (Hemat {{ imageCompressionInfo.reduction }}%)
+                </div>
+              </div>
+
+              <!-- Button Tambah Foto -->
+              <div v-else class="flex items-center gap-3">
+                <button
+                  type="button"
+                  @click="triggerFileInput"
+                  :disabled="isCompressing"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 bg-surface border border-border text-xs font-semibold text-ink hover:bg-surface-muted rounded-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <Loader2 v-if="isCompressing" class="w-3.5 h-3.5 animate-spin text-primary" />
+                  <ImageIcon v-else class="w-3.5 h-3.5" />
+                  <span>{{ isCompressing ? 'Mengompresi ke WebP...' : 'Tambahkan foto' }}</span>
+                </button>
+                <span class="text-[10px] text-ink-muted">
+                  Opsional · Otomatis dikonversi ke WebP ≤100 KB
+                </span>
+              </div>
+            </div>
 
             <!-- Toggle Superchat Option -->
             <div
@@ -508,19 +825,8 @@ function formatRelativeTime(dateStr: string): string {
               </div>
             </div>
 
-            <!-- Turnstile Indicator -->
-            <div class="p-3 bg-surface border border-border rounded-sm flex items-center justify-between text-xs">
-              <div class="flex items-center gap-2">
-                <ShieldCheck class="w-4 h-4 text-primary" />
-                <div>
-                  <div class="font-semibold text-ink">Verifikasi manusia</div>
-                  <div class="text-[10px] text-ink-muted">Cloudflare Turnstile · Terproteksi</div>
-                </div>
-              </div>
-              <span class="text-emerald-700 font-semibold flex items-center gap-1">
-                <CheckCircle2 class="w-3.5 h-3.5" /> Terverifikasi
-              </span>
-            </div>
+            <!-- Cloudflare Turnstile Verification Widget -->
+            <TurnstileWidget v-model="turnstileToken" />
 
             <!-- Status Alert Box -->
             <div
@@ -558,12 +864,30 @@ function formatRelativeTime(dateStr: string): string {
             </div>
           </div>
 
-          <!-- Right Column: QRIS Mockup Panel (Sesuai Figma 05) -->
+          <!-- Right Column: QRIS Panel (Sesuai Figma 05 & Midtrans Snap) -->
           <div class="lg:col-span-5 bg-surface border border-border p-5 rounded-sm flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="px-2 py-0.5 bg-badge-superchatBg text-badge-superchatText text-[10px] font-bold uppercase rounded-xs">
-                  DEMO / BUKAN PEMBAYARAN
+                <span
+                  class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-xs"
+                  :class="[
+                    activeCheckout?.status === 'settlement'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : activeCheckout
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-badge-superchatBg text-badge-superchatText'
+                  ]"
+                >
+                  {{
+                    activeCheckout?.status === 'settlement'
+                      ? 'Lunas (Settlement)'
+                      : activeCheckout
+                      ? 'Menunggu Pembayaran'
+                      : 'Midtrans QRIS Snap'
+                  }}
+                </span>
+                <span v-if="activeCheckout" class="font-mono text-[9px] text-ink-muted truncate max-w-[140px]">
+                  {{ activeCheckout.orderId }}
                 </span>
               </div>
 
@@ -571,32 +895,73 @@ function formatRelativeTime(dateStr: string): string {
                 Sematkan ceritamu.
               </h3>
               <p class="text-[11px] text-ink-muted leading-relaxed mb-4">
-                Superchat / Pinned Post. Tampil di atas feed selama 24 jam. Konten tetap harus lolos moderasi.
+                Superchat / Pinned Post. Tampil di urutan teratas linimasa selama 24 jam.
               </p>
 
               <div class="flex items-baseline justify-between border-t border-border pt-3 mb-4">
-                <span class="text-xs text-ink-muted">Total (contoh)</span>
-                <span class="text-xl font-bold text-ink">Rp5.000</span>
+                <span class="text-xs text-ink-muted">Total Pembayaran</span>
+                <span class="text-xl font-bold text-ink">
+                  Rp{{ (activeCheckout?.grossAmount || 5000).toLocaleString('id-ID') }}
+                </span>
               </div>
 
-              <!-- QRIS Placeholder Box -->
-              <div class="bg-canvas border border-dashed border-border p-6 rounded-sm text-center">
-                <div class="text-[11px] font-semibold text-ink-muted mb-2">QRIS · via Midtrans</div>
-                <div class="w-32 h-32 mx-auto bg-surface border border-border flex flex-col items-center justify-center p-2 rounded-xs">
-                  <QrCode class="w-16 h-16 text-ink/70" />
-                  <span class="text-[10px] font-bold text-ink tracking-widest mt-1">DEMO QRIS</span>
+              <!-- QRIS Display Box -->
+              <div class="bg-canvas border border-dashed border-border p-5 rounded-sm text-center">
+                <div class="text-[11px] font-semibold text-ink-muted mb-2">
+                  QRIS Dinamis · Midtrans Snap
                 </div>
-                <div class="text-[10px] text-ink-muted mt-3">
-                  Representasi QRIS, bukan kode bayar sungguhan.
+                <div class="w-36 h-36 mx-auto bg-surface border border-border flex flex-col items-center justify-center p-2 rounded-xs shadow-xs relative">
+                  <QrCode class="w-24 h-24 text-ink" />
+                  <span class="text-[9px] font-bold text-ink tracking-widest mt-1">QRIS STANDAR</span>
+                  <div
+                    v-if="activeCheckout?.status === 'settlement'"
+                    class="absolute inset-0 bg-emerald-700/90 text-white flex flex-col items-center justify-center p-2 rounded-xs"
+                  >
+                    <CheckCircle2 class="w-8 h-8 mb-1" />
+                    <span class="text-[10px] font-bold">LUNAS</span>
+                  </div>
                 </div>
+                <div class="text-[10px] text-ink-muted mt-2.5">
+                  {{
+                    activeCheckout?.status === 'settlement'
+                      ? 'Pembayaran berhasil diverifikasi via Webhook Midtrans.'
+                      : 'Pindai dengan GoPay, OVO, Dana, BCA, atau Livin Mandiri.'
+                  }}
+                </div>
+              </div>
+
+              <!-- Tombol Simulasi Bayar Offline / Live Presentation -->
+              <div v-if="activeCheckout && activeCheckout.status === 'pending'" class="mt-3">
+                <button
+                  type="button"
+                  @click="handleSimulatePayment"
+                  :disabled="isPaying"
+                  class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                  title="Simulasikan pembayaran QRIS sukses untuk demo presentasi"
+                >
+                  <Loader2 v-if="isPaying" class="w-3.5 h-3.5 animate-spin" />
+                  <Zap v-else class="w-3.5 h-3.5" />
+                  <span>{{ isPaying ? 'Memproses Webhook...' : '⚡ Simulasikan Bayar QRIS Sukses' }}</span>
+                </button>
+              </div>
+
+              <div
+                v-else-if="activeCheckout?.status === 'settlement'"
+                class="mt-3 p-2 bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-semibold rounded-xs flex items-center gap-1.5"
+              >
+                <CheckCircle2 class="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Superchat aktif! Postingan disematkan di posisi teratas.</span>
               </div>
             </div>
 
-            <div class="mt-4 pt-4 border-t border-border flex items-center justify-between text-xs">
-              <span class="px-2 py-0.5 bg-amber-100 text-amber-900 font-semibold text-[10px] rounded-xs">
-                Pending
+            <div class="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs">
+              <span
+                class="px-2 py-0.5 font-semibold text-[10px] rounded-xs"
+                :class="activeCheckout?.status === 'settlement' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'"
+              >
+                {{ activeCheckout?.status === 'settlement' ? 'Settlement' : 'Pending' }}
               </span>
-              <span class="text-[11px] text-ink-muted font-mono">Sisa 09:42</span>
+              <span class="text-[11px] text-ink-muted font-mono">24 Jam Pinned</span>
             </div>
           </div>
         </div>

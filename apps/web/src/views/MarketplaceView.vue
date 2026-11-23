@@ -1,117 +1,208 @@
 <script setup lang="ts">
 import AppSidebar from '@/components/layout/AppSidebar.vue';
+import { useAuthStore } from '@/stores/auth';
+import { apiFetch } from '@/utils/api';
+import { compressImageToWebp } from '@/utils/imageCompressor';
 import {
+  ArrowRight,
   Flag,
+  Image as ImageIcon,
+  Loader2,
   Plus,
   Search,
+  Sparkles,
   X
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+interface MarketplaceItem {
+  id: string;
+  title: string;
+  shortTitle: string;
+  price: number;
+  category: string;
+  condition: string;
+  negotiable?: string;
+  location: string;
+  is_boosted: boolean;
+  status: string;
+  image: string;
+  description: string;
+  sellerWa: string;
+}
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const searchQuery = ref('');
 const activeCategory = ref('Semua');
-const selectedProduct = ref<any>(null);
+const selectedProduct = ref<MarketplaceItem | null>(null);
+const products = ref<MarketplaceItem[]>([]);
+const isLoading = ref(false);
+const errorMsg = ref('');
 
-const products = ref([
-  {
-    id: 'prod-1',
-    title: 'Fujifilm X-A3 + kit lens 16–50 mm',
-    shortTitle: 'Fujifilm X-A3 + kit lens',
-    price: 2800000,
-    category: 'Elektronik',
-    condition: 'Bekas, kondisi baik',
-    negotiable: 'Bisa nego wajar',
-    location: 'Dekat gerbang utama',
-    is_boosted: true,
-    status: 'Tersedia',
-    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80',
-    description: 'Dijual karena jarang kepakai. Semua tombol normal, layar mulus. Termasuk baterai, charger, strap, dan tas kecil. Boleh cek unit dulu sebelum deal.',
-    sellerWa: '6281234567890'
-  },
-  {
-    id: 'prod-2',
-    title: 'Lampu meja belajar vintage',
-    shortTitle: 'Lampu meja belajar',
-    price: 75000,
-    category: 'Perlengkapan kos',
-    condition: 'Bekas',
-    negotiable: 'Harga pas',
-    location: 'Area kos selatan',
-    is_boosted: false,
-    status: 'Tersedia',
-    image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&auto=format&fit=crop&q=80',
-    description: 'Bohlam hangat LED hemat daya. Kabel masih aman tanpa sambungan, switch putar lancar.',
-    sellerWa: '6289876543210'
-  },
-  {
-    id: 'prod-3',
-    title: 'Paket buku teks ekonomi & statistika',
-    shortTitle: 'Paket buku ekonomi',
-    price: 120000,
-    category: 'Buku',
-    condition: 'Bekas (banyak coretan pensil)',
-    negotiable: 'Bisa nego',
-    location: 'Perpustakaan',
-    is_boosted: false,
-    status: 'Tersedia',
-    image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
-    description: 'Kumpulan 3 buku acuan semester awal. Halaman lengkap, cocok buat yang butuh referensi offline.',
-    sellerWa: '6281234567890'
-  },
-  {
-    id: 'prod-4',
-    title: 'Kalkulator scientific fx-991EX',
-    shortTitle: 'Kalkulator scientific',
-    price: 95000,
-    category: 'Elektronik',
-    condition: 'Bekas mulus',
-    negotiable: 'Pas',
-    location: 'Kantin',
-    is_boosted: false,
-    status: 'Terjual',
-    image: 'https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=600&auto=format&fit=crop&q=80',
-    description: 'Layar jernih, solar panel aktif, tombol empuk normal semua.',
-    sellerWa: '6281234567890'
-  },
-  {
-    id: 'prod-5',
-    title: 'Kursi lipat kayu, masih kokoh',
-    shortTitle: 'Kursi lipat, masih kokoh',
-    price: 90000,
-    category: 'Perlengkapan kos',
-    condition: 'Bekas',
-    negotiable: 'Bisa nego',
-    location: 'Area kos utara',
-    is_boosted: false,
-    status: 'Tersedia',
-    image: 'https://images.unsplash.com/photo-1503602642458-232111445657?w=600&auto=format&fit=crop&q=80',
-    description: 'Kayu jati belanda, engsel besi kuat, gampang dilipat pas gak dipakai.',
-    sellerWa: '6281234567890'
-  },
-  {
-    id: 'prod-6',
-    title: 'Keyboard mechanical 60% Red Switch',
-    shortTitle: 'Keyboard mechanical 60%',
-    price: 250000,
-    category: 'Elektronik',
-    condition: 'Bekas terawat',
-    negotiable: 'Bisa nego tipis',
-    location: 'Dekat gerbang utama',
-    is_boosted: false,
-    status: 'Tersedia',
-    image: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600&auto=format&fit=crop&q=80',
-    description: 'Kabel Type-C coiled bawaan, RGB backlight lancar, switch responsif tanpa double-click.',
-    sellerWa: '6281234567890'
+// Modal Pasang Iklan
+const isCreateOpen = ref(false);
+const isSubmitting = ref(false);
+const formTitle = ref('');
+const formPrice = ref<number | ''>('');
+const formCondition = ref<'bekas' | 'baru'>('bekas');
+const formCategory = ref('Elektronik');
+const formLocation = ref('');
+const formWa = ref('');
+const formDesc = ref('');
+const isBoostedSelected = ref(false);
+
+// WebP image compression state
+const imagePreview = ref('');
+const imageCompressionInfo = ref<{ originalKb: number; compressedKb: number; reduction: number } | null>(null);
+const isCompressing = ref(false);
+
+async function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (!target.files || target.files.length === 0) return;
+  const file = target.files[0];
+  isCompressing.value = true;
+  try {
+    const res = await compressImageToWebp(file, 100);
+    imagePreview.value = res.dataUrl;
+    imageCompressionInfo.value = {
+      originalKb: res.originalSizeKb,
+      compressedKb: res.compressedSizeKb,
+      reduction: res.reductionPercentage
+    };
+  } catch (err: any) {
+    alert(err.message || 'Gagal mengompresi gambar');
+  } finally {
+    isCompressing.value = false;
   }
-]);
+}
 
-// Set default selected product ke item pertama agar detail drawer tampil seperti di Figma
-selectedProduct.value = products.value[0];
+function removeImage() {
+  imagePreview.value = '';
+  imageCompressionInfo.value = null;
+}
+
+onMounted(() => {
+  loadMarketplace();
+});
+
+async function loadMarketplace() {
+  isLoading.value = true;
+  errorMsg.value = '';
+  try {
+    const res = await apiFetch('/api/posts', {
+      params: { kategori: 'marketplace' }
+    });
+    if (res.success && res.data?.items) {
+      products.value = res.data.items.map((item: any) => ({
+        id: item.id,
+        title: item.extra_meta?.judul || 'Barang Kampus',
+        shortTitle: item.extra_meta?.judul || 'Barang Kampus',
+        price: item.extra_meta?.harga || 0,
+        category: item.extra_meta?.kategori_barang || 'Umum',
+        condition: item.extra_meta?.kondisi === 'baru' ? 'Baru' : 'Bekas, kondisi baik',
+        negotiable: 'Bisa nego wajar',
+        location: item.extra_meta?.lokasi || 'Sekitar kampus',
+        is_boosted: item.is_boosted,
+        status: item.extra_meta?.status_barang || (item.status === 'resolved' ? 'Terjual' : 'Tersedia'),
+        image: item.media_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
+        description: item.teks_konten,
+        sellerWa: item.extra_meta?.whatsapp || '081234567890'
+      }));
+      if (products.value.length > 0 && !selectedProduct.value) {
+        selectedProduct.value = products.value[0];
+      }
+    }
+  } catch (err: any) {
+    errorMsg.value = err.message || 'Gagal memuat barang marketplace';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function handleOpenCreate() {
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+  isCreateOpen.value = true;
+}
+
+async function handleCreateProduct() {
+  if (!formTitle.value || !formPrice.value || !formDesc.value || isSubmitting.value) return;
+
+  isSubmitting.value = true;
+  try {
+    const res = await apiFetch('/api/posts/marketplace', {
+      method: 'POST',
+      body: JSON.stringify({
+        judul: formTitle.value,
+        harga: Number(formPrice.value),
+        kondisi: formCondition.value,
+        whatsapp: formWa.value || '081234567890',
+        lokasi: formLocation.value || 'Sekitar kampus',
+        deskripsi: formDesc.value,
+        media_url: imagePreview.value || undefined,
+        is_boosted: isBoostedSelected.value
+      })
+    });
+
+    if (res.success && res.data) {
+      const newItem: MarketplaceItem = {
+        id: res.data.id,
+        title: res.data.extra_meta?.judul || formTitle.value,
+        shortTitle: res.data.extra_meta?.judul || formTitle.value,
+        price: res.data.extra_meta?.harga || Number(formPrice.value),
+        category: formCategory.value,
+        condition: formCondition.value === 'baru' ? 'Baru' : 'Bekas, kondisi baik',
+        negotiable: 'Bisa nego wajar',
+        location: formLocation.value || 'Sekitar kampus',
+        is_boosted: res.data.is_boosted,
+        status: 'Tersedia',
+        image: res.data.media_url || imagePreview.value || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
+        description: res.data.teks_konten,
+        sellerWa: formWa.value || '081234567890'
+      };
+      products.value.unshift(newItem);
+      selectedProduct.value = newItem;
+      isCreateOpen.value = false;
+      // Reset form
+      formTitle.value = '';
+      formPrice.value = '';
+      formDesc.value = '';
+      formLocation.value = '';
+      formWa.value = '';
+      removeImage();
+    }
+  } catch (err: any) {
+    alert(err.message || 'Gagal memasang barang');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function handleMarkSold(prod: MarketplaceItem) {
+  try {
+    const res = await apiFetch(`/api/posts/${prod.id}/resolve`, {
+      method: 'PUT'
+    });
+    if (res.success) {
+      prod.status = 'Terjual';
+    }
+  } catch (err: any) {
+    alert(err.message || 'Gagal memperbarui status');
+  }
+}
 
 const filteredProducts = computed(() => {
-  return products.value.filter(p => {
+  return products.value.filter((p) => {
     const matchCat = activeCategory.value === 'Semua' || p.category === activeCategory.value;
-    const matchSearch = !searchQuery.value || p.title.toLowerCase().includes(searchQuery.value.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.value.toLowerCase());
+    const matchSearch =
+      !searchQuery.value ||
+      p.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      p.description.toLowerCase().includes(searchQuery.value.toLowerCase());
     return matchCat && matchSearch;
   });
 });
@@ -128,145 +219,155 @@ function formatRupiah(num: number) {
 
     <!-- Main Content Area -->
     <div class="flex-1 min-w-0">
-      <!-- Header Section -->
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      <!-- Header Section (Sesuai Figma 07_Marketplace_Desktop.png) -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
         <div>
           <div class="text-[11px] font-semibold text-ink-muted tracking-wider uppercase mb-1">
-            MARKETPLACE / SEKITAR KAMPUS
+            PASAR KAMPUS / JUAL-BELI LOKAL
           </div>
           <h1 class="font-serif text-3xl sm:text-4xl text-ink font-normal leading-tight">
-            Barang pindah tangan.
+            Oper barang, hemat uang.
           </h1>
           <p class="text-xs sm:text-sm text-ink-muted mt-1.5">
-            Dari meja kos ke pemilik baru. Temukan yang kamu butuhkan, dekat-dekat aja.
+            Buku bekas, perlengkapan kos, dan barang yang masih layak pakai. Ketemuan langsung di kampus.
           </p>
         </div>
 
         <button
-          class="bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold px-4 py-2.5 rounded-sm transition-all flex items-center gap-1.5 shadow-xs shrink-0"
+          @click="handleOpenCreate"
+          class="bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold px-4 py-2.5 rounded-sm transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
         >
-          <Plus class="w-3.5 h-3.5" />
-          <span>Jual barang</span>
+          <Plus class="w-4 h-4" />
+          <span>Pasang Iklan</span>
         </button>
       </div>
 
-      <!-- Search Input Bar (Sesuai Figma) -->
-      <div class="mb-5">
-        <div class="relative w-full">
+      <!-- Search & Category Filters (Sesuai Figma) -->
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-6">
+        <!-- Search Input -->
+        <div class="relative flex-1 max-w-sm">
           <Search class="w-4 h-4 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Cari kamera, buku, perlengkapan kos..."
-            class="w-full pl-10 pr-4 py-2.5 bg-surface border border-border text-xs rounded-sm focus:outline-none focus:border-ink placeholder:text-ink-muted transition-colors"
+            placeholder="Cari buku, lampu meja, kipas..."
+            class="w-full pl-10 pr-4 py-2 bg-surface border border-border text-xs rounded-sm focus:outline-none focus:border-ink placeholder:text-ink-muted/80"
           />
         </div>
-      </div>
 
-      <!-- Filter Categories Tabs (Sesuai Figma) -->
-      <div class="flex items-center gap-6 border-b border-border pb-2.5 mb-5 text-xs font-medium">
-        <button
-          v-for="cat in ['Semua', 'Elektronik', 'Buku', 'Perlengkapan kos']"
-          :key="cat"
-          @click="activeCategory = cat"
-          class="pb-1 transition-colors"
-          :class="activeCategory === cat ? 'text-ink font-bold border-b-2 border-ink' : 'text-ink-muted hover:text-ink'"
-        >
-          {{ cat }}
-        </button>
-      </div>
-
-      <!-- Count & Sort Label -->
-      <div class="flex items-center justify-between text-xs text-ink-muted mb-4 font-medium">
-        <span>{{ filteredProducts.length }} barang di sekitar kamu</span>
-        <button class="hover:text-ink flex items-center gap-1">
-          <span>Terbaru</span>
-          <span>↓</span>
-        </button>
-      </div>
-
-      <!-- Products Grid & Side Drawer Layout (Sesuai Figma 07) -->
-      <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <!-- Products Grid List -->
-        <div class="xl:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div
-            v-for="item in filteredProducts"
-            :key="item.id"
-            @click="selectedProduct = item"
-            class="bg-surface border border-border p-3.5 rounded-sm cursor-pointer hover:border-ink/40 transition-all flex flex-col justify-between group"
-            :class="{ 'ring-1 ring-primary': selectedProduct?.id === item.id }"
+        <!-- Filter Pills -->
+        <div class="flex items-center gap-2 overflow-x-auto text-xs pb-1 sm:pb-0">
+          <button
+            v-for="cat in ['Semua', 'Elektronik', 'Perlengkapan kos', 'Buku']"
+            :key="cat"
+            @click="activeCategory = cat"
+            class="px-3 py-1.5 rounded-sm font-medium transition-colors whitespace-nowrap"
+            :class="activeCategory === cat ? 'bg-ink text-white' : 'bg-surface border border-border text-ink hover:bg-surface-muted'"
           >
-            <!-- Product Photo -->
-            <div class="aspect-4/3 w-full bg-surface-muted overflow-hidden rounded-xs mb-3 relative">
-              <img
-                :src="item.image"
-                :alt="item.title"
-                class="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-              />
-            </div>
+            {{ cat }}
+          </button>
+        </div>
+      </div>
 
-            <!-- Meta & Title -->
-            <div class="flex-1">
-              <div class="flex items-center justify-between text-[11px] text-ink-muted mb-1">
-                <span>{{ item.category }}</span>
+      <!-- Loading State -->
+      <div v-if="isLoading" class="p-12 text-center text-ink-muted text-xs flex flex-col items-center gap-2">
+        <Loader2 class="w-5 h-5 animate-spin text-primary" />
+        <span>Memuat etalase pasar kampus...</span>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="errorMsg" class="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm mb-4">
+        {{ errorMsg }}
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="filteredProducts.length === 0" class="p-12 text-center bg-surface border border-dashed border-border rounded-sm text-xs text-ink-muted">
+        <p class="font-medium text-ink mb-1">Belum ada barang di etalase marketplace.</p>
+        <p class="mb-4">Jadilah yang pertama menjual barang bekas atau perlengkapan kos di kampus!</p>
+        <button
+          @click="handleOpenCreate"
+          class="bg-primary text-white px-4 py-2 rounded-sm font-semibold hover:bg-primary-hover transition-colors inline-flex items-center gap-1.5"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>Pasang Iklan Sekarang</span>
+        </button>
+      </div>
+
+      <!-- 2-Column Layout: Grid Katalog & Sticky Product Detail (Sesuai Figma) -->
+      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <!-- Left: Product Grid Cards (Sesuai Figma) -->
+        <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div
+            v-for="prod in filteredProducts"
+            :key="prod.id"
+            @click="selectedProduct = prod"
+            class="bg-surface border p-3 rounded-sm cursor-pointer transition-all hover:border-ink/40 group flex flex-col justify-between"
+            :class="[
+              selectedProduct?.id === prod.id ? 'border-primary ring-1 ring-primary' : 'border-border',
+              prod.is_boosted ? 'bg-primary-soft/30' : ''
+            ]"
+          >
+            <div>
+              <!-- Product Image Container -->
+              <div class="w-full h-40 bg-canvas rounded-xs overflow-hidden mb-3 relative border border-border/40">
+                <img
+                  :src="prod.image"
+                  :alt="prod.title"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <!-- Boosted Badge -->
                 <span
-                  v-if="item.is_boosted"
-                  class="px-1.5 py-0.2 bg-primary-soft text-primary font-bold text-[10px] rounded-xs"
+                  v-if="prod.is_boosted"
+                  class="absolute top-2 left-2 px-1.5 py-0.5 bg-primary text-white text-[9px] font-bold uppercase rounded-xs tracking-wider"
                 >
-                  Boost
+                  BOOSTED
                 </span>
+                <!-- Status Badge -->
                 <span
-                  v-else-if="item.status === 'Terjual'"
-                  class="px-1.5 py-0.2 bg-surface-muted text-ink-muted font-bold text-[10px] rounded-xs"
+                  class="absolute bottom-2 right-2 px-1.5 py-0.5 text-[10px] font-semibold rounded-xs backdrop-blur-md"
+                  :class="prod.status === 'Terjual' ? 'bg-ink/80 text-white' : 'bg-surface/90 text-ink border border-border'"
                 >
-                  Terjual
+                  {{ prod.status }}
                 </span>
               </div>
 
-              <h3 class="font-bold text-xs text-ink line-clamp-1 mb-1">
-                {{ item.shortTitle }}
+              <!-- Price & Category -->
+              <div class="flex items-baseline justify-between gap-2 mb-1">
+                <span class="font-bold text-ink text-sm sm:text-base">
+                  {{ formatRupiah(prod.price) }}
+                </span>
+                <span class="text-[10px] text-ink-muted">
+                  {{ prod.condition }}
+                </span>
+              </div>
+
+              <!-- Title -->
+              <h3 class="text-xs font-semibold text-ink group-hover:text-primary transition-colors line-clamp-1 mb-1">
+                {{ prod.shortTitle }}
               </h3>
 
-              <div class="text-sm font-bold text-ink">
-                {{ formatRupiah(item.price) }}
-              </div>
-
-              <div class="text-[11px] text-ink-muted mt-1">
-                {{ item.location }}
+              <!-- Location & Nego -->
+              <div class="text-[11px] text-ink-muted flex items-center justify-between">
+                <span>{{ prod.location }}</span>
+                <span>{{ prod.negotiable }}</span>
               </div>
             </div>
-
-            <div class="pt-2 mt-2 border-t border-border/40 text-[11px] text-primary font-semibold flex items-center gap-1">
-              <span>Detail dipilih</span>
-              <span class="text-[10px]">↗</span>
-            </div>
-          </div>
-
-          <!-- Load More Button -->
-          <div class="sm:col-span-2 text-center py-4">
-            <button class="w-full py-2.5 bg-surface border border-border text-xs font-semibold text-ink hover:bg-surface-muted transition-colors rounded-sm inline-flex items-center justify-center gap-1.5">
-              <span>Lihat barang lainnya</span>
-              <span>↓</span>
-            </button>
           </div>
         </div>
 
-        <!-- Right Side: Product Detail Panel (Sesuai Figma 07) -->
-        <div
-          v-if="selectedProduct"
-          class="xl:col-span-5 bg-surface border border-border p-5 rounded-sm flex flex-col justify-between"
-        >
+        <!-- Right: Sticky Product Detail Card (Sesuai Figma 07) -->
+        <div v-if="selectedProduct" class="lg:col-span-5 bg-surface border border-border p-6 rounded-sm sticky top-24 shadow-xs">
           <div>
-            <!-- Top bar -->
-            <div class="flex items-center justify-between text-xs font-bold text-ink-muted tracking-wider uppercase mb-3">
-              <span>DETAIL BARANG</span>
-              <button @click="selectedProduct = null" class="hover:text-ink">
-                <X class="w-4 h-4" />
-              </button>
+            <!-- Header Detail -->
+            <div class="flex items-center justify-between text-[11px] text-ink-muted mb-2">
+              <span class="font-bold uppercase tracking-wider text-primary">DETAIL BARANG</span>
+              <span class="px-2 py-0.5 rounded-xs text-[10px] font-semibold" :class="selectedProduct.status === 'Terjual' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'">
+                {{ selectedProduct.status }}
+              </span>
             </div>
 
             <!-- Big Image Preview -->
-            <div class="aspect-4/3 w-full bg-surface-muted rounded-xs overflow-hidden mb-3 relative">
+            <div class="w-full h-52 bg-canvas rounded-xs overflow-hidden mb-4 border border-border">
               <img
                 :src="selectedProduct.image"
                 :alt="selectedProduct.title"
@@ -274,43 +375,29 @@ function formatRupiah(num: number) {
               />
             </div>
 
-            <!-- Indicator -->
-            <div class="flex items-center justify-between text-xs text-ink-muted mb-3">
-              <span>Foto 1 dari 3 · ‹ ›</span>
-              <span
-                class="px-2 py-0.5 rounded-xs font-bold text-[10px]"
-                :class="selectedProduct.status === 'Tersedia' ? 'bg-badge-foundBg text-badge-foundText' : 'bg-surface-muted text-ink-muted'"
-              >
-                {{ selectedProduct.status }}
-              </span>
-            </div>
-
-            <!-- Title in Serif -->
-            <h2 class="font-serif text-xl sm:text-2xl text-ink font-normal leading-snug mb-1">
+            <h2 class="font-serif text-xl text-ink font-normal mb-1">
               {{ selectedProduct.title }}
             </h2>
-
-            <!-- Price -->
-            <div class="text-xl font-bold text-ink mb-1">
+            <div class="text-2xl font-bold text-ink mb-4">
               {{ formatRupiah(selectedProduct.price) }}
             </div>
 
-            <div class="text-xs text-ink-muted mb-4">
-              {{ selectedProduct.negotiable }} · {{ selectedProduct.condition }}
+            <!-- Meta details row -->
+            <div class="grid grid-cols-2 gap-2 text-xs border-t border-b border-border py-3 mb-4">
+              <div>
+                <span class="text-[10px] text-ink-muted block">Kondisi</span>
+                <span class="font-medium text-ink">{{ selectedProduct.condition }}</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-ink-muted block">Lokasi temu</span>
+                <span class="font-medium text-ink">{{ selectedProduct.location }}</span>
+              </div>
             </div>
 
-            <hr class="border-border mb-4" />
-
             <!-- Description -->
-            <p class="text-xs text-ink leading-relaxed mb-4">
+            <div class="text-xs text-ink leading-relaxed mb-6 whitespace-pre-line">
+              <span class="font-bold block mb-1 text-[11px] uppercase tracking-wider text-ink-muted">Catatan Penjual</span>
               {{ selectedProduct.description }}
-            </p>
-
-            <!-- Metadata List -->
-            <div class="space-y-1 text-xs text-ink-muted border-t border-border pt-3 mb-5">
-              <div>Lokasi temu: {{ selectedProduct.location }}</div>
-              <div>Diunggah 12 Okt 2026 · {{ selectedProduct.category }}</div>
-              <div>Penjual: pemilik barang</div>
             </div>
 
             <!-- WhatsApp Chat Button (Sesuai Figma) -->
@@ -318,46 +405,189 @@ function formatRupiah(num: number) {
               :href="`https://wa.me/${selectedProduct.sellerWa}?text=Halo,%20saya%20tertarik%20dengan%20barang%20'${encodeURIComponent(selectedProduct.title)}'%20di%20Menfessin%20Aja.`"
               target="_blank"
               rel="noopener noreferrer"
-              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold py-3 px-4 rounded-sm flex items-center justify-center gap-2 shadow-xs transition-all mb-4"
+              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white text-xs font-semibold py-3 px-4 rounded-sm flex items-center justify-center gap-2 shadow-xs transition-all mb-3"
             >
               <span>Hubungi penjual via WhatsApp</span>
-              <span class="text-xs">↗</span>
+              <ArrowRight class="w-3.5 h-3.5" />
             </a>
 
             <!-- Sepakati Langsung Box (Sesuai Figma) -->
-            <div class="p-3.5 bg-primary-soft text-xs text-ink leading-relaxed rounded-xs mb-4">
+            <div class="p-3 bg-primary-soft text-xs text-ink leading-relaxed rounded-xs mb-3">
               <span class="font-bold text-primary block mb-0.5">Sepakati langsung dengan penjual.</span>
-              Pembayaran barang dan ambil barang diatur lewat WhatsApp. Menfessin Aja tidak menyediakan checkout, escrow, atau pengiriman. Pilih tempat temu yang aman.
+              Pembayaran dan ambil barang diatur lewat WhatsApp. Menfessin Aja tidak menyediakan checkout atau pengiriman.
             </div>
 
-            <button class="text-xs text-ink-muted hover:text-ink flex items-center gap-1.5 transition-colors">
-              <Flag class="w-3.5 h-3.5" />
-              <span>Laporkan listing ini</span>
-            </button>
+            <div class="flex items-center justify-between text-xs">
+              <button
+                v-if="selectedProduct.status !== 'Terjual'"
+                @click="handleMarkSold(selectedProduct)"
+                class="text-xs text-ink-muted hover:text-ink underline cursor-pointer"
+              >
+                Tandai sudah terjual
+              </button>
+              <button class="text-xs text-ink-muted hover:text-ink flex items-center gap-1">
+                <Flag class="w-3 h-3" />
+                <span>Laporkan listing</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Bottom Promotional Banner for Seller (Sesuai Figma 07) -->
-      <div class="mt-8 p-5 bg-surface border border-border rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div class="text-[11px] font-bold text-ink-muted uppercase tracking-wider mb-0.5">
-            LISTINGMU / LAMPU MEJA BELAJAR
-          </div>
-          <div class="text-xs text-ink">
-            Ingin lebih terlihat? Boost listing via QRIS Midtrans, hanya untuk biaya promosi. Contoh Rp3.000.
-          </div>
+    <!-- PASANG IKLAN MODAL -->
+    <div
+      v-if="isCreateOpen"
+      class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+    >
+      <div class="bg-canvas border border-border w-full max-w-lg p-6 sm:p-8 rounded-sm shadow-2xl relative my-8">
+        <button
+          @click="isCreateOpen = false"
+          class="absolute top-5 right-5 text-ink-muted hover:text-ink p-1 transition-colors"
+        >
+          <X class="w-5 h-5" />
+        </button>
+
+        <div class="mb-4">
+          <div class="text-[10px] font-bold text-ink-muted uppercase tracking-wider">PASAR KAMPUS</div>
+          <h2 class="font-serif text-2xl text-ink font-normal mt-0.5">Pasang Iklan Barang</h2>
         </div>
 
-        <div class="flex items-center gap-3 shrink-0">
-          <button class="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-sm transition-all flex items-center gap-1">
-            <span>Boost listing</span>
-            <span class="text-[10px]">↗</span>
-          </button>
-          <button class="px-4 py-2 bg-surface border border-border text-ink hover:bg-surface-muted text-xs font-semibold rounded-sm transition-colors">
-            Tandai terjual
-          </button>
-        </div>
+        <form @submit.prevent="handleCreateProduct" class="space-y-3.5 text-xs">
+          <div>
+            <label class="block font-semibold text-ink mb-1">Nama / Judul Barang *</label>
+            <input
+              v-model="formTitle"
+              type="text"
+              required
+              placeholder="Contoh: Lampu meja belajar atau Kalkulator TI-84"
+              class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-ink mb-1">Harga (Rp) *</label>
+              <input
+                v-model="formPrice"
+                type="number"
+                required
+                placeholder="50000"
+                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-ink mb-1">Kondisi</label>
+              <select
+                v-model="formCondition"
+                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+              >
+                <option value="bekas">Bekas (Layak)</option>
+                <option value="baru">Baru</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-ink mb-1">No WhatsApp Penjual *</label>
+              <input
+                v-model="formWa"
+                type="text"
+                placeholder="081234567890"
+                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-ink mb-1">Lokasi Temu</label>
+              <input
+                v-model="formLocation"
+                type="text"
+                placeholder="Kantin atau Gerbang Utama"
+                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-ink mb-1">Deskripsi / Catatan Barang *</label>
+            <textarea
+              v-model="formDesc"
+              rows="3"
+              required
+              placeholder="Jelaskan kondisi barang, kelengkapan, alasan dijual..."
+              class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+            ></textarea>
+          </div>
+
+          <!-- WebP Image Upload Section (SRS 1.3.3 & NFR-001) -->
+          <div>
+            <label class="block font-semibold text-ink mb-1">Foto Barang (Opsional)</label>
+            <div v-if="imagePreview" class="relative w-full h-40 bg-canvas border border-border rounded-sm overflow-hidden mb-2">
+              <img :src="imagePreview" alt="Preview WebP" class="w-full h-full object-cover" />
+              <button
+                type="button"
+                @click="removeImage"
+                class="absolute top-2 right-2 p-1 bg-black/70 text-white rounded-full hover:bg-black transition-colors"
+                title="Hapus foto"
+              >
+                <X class="w-3.5 h-3.5" />
+              </button>
+              <div v-if="imageCompressionInfo" class="absolute bottom-2 left-2 px-2 py-0.5 bg-emerald-700 text-white text-[10px] font-bold rounded-xs shadow-xs">
+                ✓ WebP • {{ imageCompressionInfo.compressedKb }} KB (Hemat {{ imageCompressionInfo.reduction }}%)
+              </div>
+            </div>
+
+            <div v-else>
+              <label class="cursor-pointer border border-dashed border-border hover:border-ink/50 rounded-sm p-4 text-center block transition-colors bg-surface">
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  @change="handleFileSelect"
+                />
+                <div class="flex flex-col items-center gap-1 text-ink-muted">
+                  <Loader2 v-if="isCompressing" class="w-5 h-5 animate-spin text-primary" />
+                  <ImageIcon v-else class="w-5 h-5 text-ink-muted" />
+                  <span class="font-semibold text-ink text-xs">
+                    {{ isCompressing ? 'Mengompresi ke WebP...' : 'Pilih Foto dari Perangkat' }}
+                  </span>
+                  <span class="text-[10px]">Otomatis dikonversi ke WebP &lt; 100 KB</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Boost Listing Checkbox -->
+          <label class="flex items-start gap-2.5 p-3 bg-primary-soft border border-primary/20 rounded-sm cursor-pointer">
+            <input v-model="isBoostedSelected" type="checkbox" class="accent-primary mt-0.5" />
+            <div class="text-xs">
+              <span class="font-bold text-primary flex items-center gap-1">
+                <Sparkles class="w-3.5 h-3.5" />
+                Sematkan dengan Boost Listing
+              </span>
+              <span class="text-ink-muted text-[11px] block mt-0.5">Tampil di urutan teratas katalog marketplace.</span>
+            </div>
+          </label>
+
+          <div class="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              :disabled="isSubmitting"
+              class="bg-primary hover:bg-primary-hover text-white font-semibold px-5 py-2.5 rounded-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
+              <span>Pasang Sekarang</span>
+            </button>
+            <button
+              type="button"
+              @click="isCreateOpen = false"
+              class="bg-surface border border-border text-ink px-4 py-2.5 rounded-sm hover:bg-surface-muted transition-colors"
+            >
+              Batal
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

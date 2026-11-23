@@ -46,6 +46,40 @@ export class PostController {
   }
 
   /**
+   * POST /api/posts/preview-moderation
+   * Mengevaluasi teks secara instan untuk pratinjau sanitasi privasi & skor AI
+   */
+  static async previewModeration(c: Context) {
+    try {
+      const body = await c.req.json();
+      const text = typeof body.teks_konten === 'string' ? body.teks_konten : '';
+
+      const { sanitizeContent } = await import('../utils/sanitizer.js');
+      const { AiModerationService } = await import('../services/ai-moderation.service.js');
+
+      const sanitization = sanitizeContent(text);
+      const moderation = await AiModerationService.evaluateText(sanitization.sanitizedText);
+
+      return c.json({
+        success: true,
+        data: {
+          originalText: text,
+          sanitizedText: sanitization.sanitizedText,
+          nimMaskedCount: sanitization.nimMaskedCount,
+          phoneMaskedCount: sanitization.phoneMaskedCount,
+          aiScore: moderation.aiScore,
+          isSafe: moderation.isSafe,
+          status: moderation.status,
+          flags: moderation.flags,
+          reason: moderation.reason,
+        },
+      });
+    } catch (err: any) {
+      return c.json({ success: false, error: err.message || 'Gagal mengevaluasi teks' }, 500);
+    }
+  }
+
+  /**
    * POST /api/posts/menfess
    * Mengirim menfess anonim baru
    */
@@ -68,10 +102,12 @@ export class PostController {
       const { teks_konten } = parseResult.data;
       const categoryPill = typeof body.category_pill === 'string' ? body.category_pill : 'Curhat';
       const isSuperchat = Boolean(body.is_superchat);
+      const mediaUrl = typeof body.media_url === 'string' ? body.media_url : null;
 
       const result = await PostService.createMenfess({
         userId: user.id,
         teksKonten: teks_konten,
+        mediaUrl,
         categoryPill,
         isSuperchat,
       });
@@ -93,6 +129,102 @@ export class PostController {
       }, 201);
     } catch (err: any) {
       return c.json({ success: false, error: err.message || 'Gagal mengirim menfess' }, 500);
+    }
+  }
+
+  /**
+   * POST /api/posts/marketplace
+   * Pasang listing barang baru di Marketplace
+   */
+  static async createMarketplace(c: Context) {
+    try {
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ success: false, error: 'Otentikasi diperlukan' }, 401);
+      }
+
+      const body = await c.req.json();
+      if (!body.judul || !body.deskripsi || !body.harga) {
+        return c.json({ success: false, error: 'Judul, deskripsi, dan harga wajib diisi' }, 400);
+      }
+
+      const post = await PostService.createMarketplace({
+        userId: user.id,
+        judul: String(body.judul),
+        deskripsi: String(body.deskripsi),
+        harga: Number(body.harga),
+        whatsapp: String(body.whatsapp || '081234567890'),
+        kondisi: body.kondisi === 'baru' ? 'baru' : 'bekas',
+        lokasi: body.lokasi || 'Kampus',
+        mediaUrl: body.media_url,
+        isBoosted: Boolean(body.is_boosted)
+      });
+
+      return c.json({
+        success: true,
+        message: 'Barang berhasil dipasang di marketplace!',
+        data: post
+      }, 201);
+    } catch (err: any) {
+      return c.json({ success: false, error: err.message || 'Gagal memasang barang' }, 500);
+    }
+  }
+
+  /**
+   * POST /api/posts/lost_found
+   * Buat laporan barang hilang / ditemukan
+   */
+  static async createLostFound(c: Context) {
+    try {
+      const user = c.get('user');
+      if (!user) {
+        return c.json({ success: false, error: 'Otentikasi diperlukan' }, 401);
+      }
+
+      const body = await c.req.json();
+      if (!body.judul || !body.deskripsi || !body.lokasi) {
+        return c.json({ success: false, error: 'Nama barang, lokasi, dan deskripsi wajib diisi' }, 400);
+      }
+
+      const post = await PostService.createLostFound({
+        userId: user.id,
+        judul: String(body.judul),
+        deskripsi: String(body.deskripsi),
+        tipeLaporan: body.tipe_laporan === 'hilang' ? 'hilang' : 'ditemukan',
+        lokasi: String(body.lokasi),
+        whatsapp: body.whatsapp,
+        mediaUrl: body.media_url
+      });
+
+      return c.json({
+        success: true,
+        message: 'Laporan berhasil dibuat!',
+        data: post
+      }, 201);
+    } catch (err: any) {
+      return c.json({ success: false, error: err.message || 'Gagal membuat laporan' }, 500);
+    }
+  }
+
+  /**
+   * PUT /api/posts/:id/resolve
+   * Tandai barang terjual atau laporan selesai
+   */
+  static async resolvePost(c: Context) {
+    try {
+      const postId = c.req.param('id');
+      const updated = await PostService.resolvePost(postId);
+      if (!updated) {
+        return c.json({ success: false, error: 'Postingan tidak ditemukan' }, 404);
+      }
+
+      return c.json({
+        success: true,
+        message: 'Status postingan berhasil diperbarui menjadi selesai',
+        data: updated
+      });
+    } catch (err: any) {
+      return c.json({ success: false, error: err.message || 'Gagal memperbarui status' }, 500);
     }
   }
 

@@ -31,6 +31,7 @@ app.route('/api/health', healthRouter);
 app.route('/api/auth', authRouter);
 app.route('/api/posts', postsRouter);
 app.route('/api/transaction', transactionsRouter);
+app.route('/api/transactions', transactionsRouter);
 app.route('/api/admin', adminRouter);
 
 // Fallback 404

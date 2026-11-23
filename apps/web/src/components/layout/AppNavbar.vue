@@ -45,13 +45,13 @@ function handleLogout() {
 
       <!-- Right Actions (Sesuai Figma) -->
       <div class="flex items-center gap-4 sm:gap-6 text-xs font-medium">
-        <a 
-          href="#bantuan" 
+        <router-link 
+          to="/bantuan" 
           class="text-ink hover:underline hidden sm:inline-flex items-center gap-0.5"
         >
           <span>Bantuan</span>
           <span class="text-[10px]">↗</span>
-        </a>
+        </router-link>
 
         <!-- Authenticated State -->
         <template v-if="authStore.isAuthenticated">

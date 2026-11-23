@@ -30,5 +30,4 @@ export const ENV = {
   JUAN_ROUTER_API_KEY: process.env.JUAN_ROUTER_API_KEY || 'mock-juan-router-key',
   JUAN_ROUTER_BASE_URL: process.env.JUAN_ROUTER_BASE_URL || 'https://api.juanrouter.com/v1',
   JUAN_ROUTER_TEXT_MODEL: process.env.JUAN_ROUTER_TEXT_MODEL || 'llm-text-moderator',
-  JUAN_ROUTER_VISION_MODEL: process.env.JUAN_ROUTER_VISION_MODEL || 'cv-prohibited-detector',
 };

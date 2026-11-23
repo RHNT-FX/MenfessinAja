@@ -11,6 +11,7 @@ import { AiModerationService, type ModerationResult } from './ai-moderation.serv
 export interface CreateMenfessInput {
   userId: string;
   teksKonten: string;
+  mediaUrl?: string | null;
   categoryPill?: string;
   isSuperchat?: boolean;
 }
@@ -30,7 +31,7 @@ export class PostService {
    * Membuat postingan menfess baru melalui pipeline Sanitasi Regex dan Moderasi AI
    */
   static async createMenfess(input: CreateMenfessInput): Promise<CreateMenfessOutput> {
-    const { userId, teksKonten, categoryPill = 'Curhat', isSuperchat = false } = input;
+    const { userId, teksKonten, mediaUrl = null, categoryPill = 'Curhat', isSuperchat = false } = input;
 
     // 1. Tahap 1: Sanitasi Regex Lokal (NFR-002: 100% Akurasi Penyamaran NIM & No HP)
     const sanitization = sanitizeContent(teksKonten);
@@ -44,7 +45,7 @@ export class PostService {
       user_id: userId,
       kategori: 'menfess',
       teks_konten: sanitizedText,
-      media_url: null,
+      media_url: mediaUrl,
       ai_score: moderation.aiScore,
       status: moderation.status,
       is_boosted: isSuperchat,
@@ -80,6 +81,92 @@ export class PostService {
     return PostRepository.findAll({
       ...options,
       status: 'approved',
+    });
+  }
+
+  /**
+   * Membuat listing marketplace C2C baru
+   */
+  static async createMarketplace(input: {
+    userId: string;
+    judul: string;
+    deskripsi: string;
+    harga: number;
+    whatsapp: string;
+    kondisi?: 'baru' | 'bekas';
+    lokasi?: string;
+    mediaUrl?: string;
+    isBoosted?: boolean;
+  }): Promise<Post> {
+    const { userId, judul, deskripsi, harga, whatsapp, kondisi = 'bekas', lokasi = 'Sekitar kampus', mediaUrl, isBoosted = false } = input;
+    const sanitizedDesc = sanitizeContent(deskripsi).sanitizedText;
+    const sanitizedTitle = sanitizeContent(judul).sanitizedText;
+
+    return PostRepository.create({
+      user_id: userId,
+      kategori: 'marketplace',
+      teks_konten: sanitizedDesc,
+      media_url: mediaUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80',
+      ai_score: 0.01,
+      status: 'approved',
+      is_boosted: isBoosted,
+      upvotes_count: 0,
+      extra_meta: {
+        judul: sanitizedTitle,
+        harga,
+        whatsapp,
+        kondisi,
+        lokasi,
+        status_barang: 'Tersedia'
+      }
+    });
+  }
+
+  /**
+   * Membuat laporan barang hilang / ditemukan (Lost and Found)
+   */
+  static async createLostFound(input: {
+    userId: string;
+    judul: string;
+    deskripsi: string;
+    tipeLaporan: 'hilang' | 'ditemukan';
+    lokasi: string;
+    whatsapp?: string;
+    mediaUrl?: string;
+  }): Promise<Post> {
+    const { userId, judul, deskripsi, tipeLaporan, lokasi, whatsapp, mediaUrl } = input;
+    const sanitizedDesc = sanitizeContent(deskripsi).sanitizedText;
+    const sanitizedTitle = sanitizeContent(judul).sanitizedText;
+
+    return PostRepository.create({
+      user_id: userId,
+      kategori: 'lost_found',
+      teks_konten: sanitizedDesc,
+      media_url: mediaUrl || 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&auto=format&fit=crop&q=80',
+      ai_score: 0.01,
+      status: 'approved',
+      is_boosted: false,
+      upvotes_count: 0,
+      extra_meta: {
+        judul: sanitizedTitle,
+        tipe_laporan: tipeLaporan,
+        lokasi,
+        whatsapp: whatsapp || '',
+        is_resolved: false
+      }
+    });
+  }
+
+  /**
+   * Menandai postingan selesai / terjual (resolve)
+   */
+  static async resolvePost(postId: string): Promise<Post | null> {
+    return PostRepository.update(postId, {
+      status: 'resolved',
+      extra_meta: {
+        is_resolved: true,
+        status_barang: 'Terjual'
+      }
     });
   }
 

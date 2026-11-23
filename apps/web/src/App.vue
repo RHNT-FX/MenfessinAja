@@ -25,11 +25,11 @@ onMounted(() => {
       <div class="max-w-[1360px] mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <p class="font-medium">Menfessin Aja. © 2026</p>
         <div class="flex items-center gap-4 text-ink-muted">
-          <a href="#privasi" class="hover:text-ink transition-colors">Privasi</a>
+          <router-link to="/privasi" class="hover:text-ink transition-colors">Privasi</router-link>
           <span>/</span>
-          <a href="#pedoman" class="hover:text-ink transition-colors">Pedoman</a>
+          <router-link to="/pedoman" class="hover:text-ink transition-colors">Pedoman</router-link>
           <span>/</span>
-          <a href="#bantuan" class="hover:text-ink transition-colors">Bantuan</a>
+          <router-link to="/bantuan" class="hover:text-ink transition-colors">Bantuan</router-link>
         </div>
       </div>
     </footer>

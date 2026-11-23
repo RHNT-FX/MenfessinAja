@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS moderation_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admin_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    post_id UUID NOT NULL REFERENCES posts(id) ON DELETE RESTRICT,
+    post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
     keputusan VARCHAR(50) NOT NULL, -- 'approve', 'reject'
     alasan TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -87,5 +87,5 @@ ON CONFLICT (email) DO NOTHING;
 -- Seed Post Menfess (Pinned / Superchat)
 INSERT INTO posts (id, user_id, kategori, teks_konten, ai_score, status, is_boosted, upvotes_count)
 VALUES 
-    ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'menfess', 'Selamat datang di Menfessin Aja! Forum anonim resmi civitas kampus. Jaga etika dan hindari penyebaran data pribadi ya!', 0.02, 'approved', true, 42)
+    ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'menfess', 'Selamat datang di Menfessin Aja! Forum anonim resmi civitas kampus. Jaga etika dan hindari penyebaran data pribadi ya!', 0.02, 'approved', true, 0)
 ON CONFLICT (id) DO NOTHING;

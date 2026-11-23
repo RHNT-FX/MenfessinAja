@@ -92,15 +92,15 @@ const topics = [
 
     <!-- Links Bantuan & Info (Sesuai Figma) -->
     <div class="space-y-2 text-xs text-ink-muted">
-      <a href="#pedoman" class="block font-semibold text-ink hover:underline">
+      <router-link to="/pedoman" class="block font-semibold text-ink hover:underline">
         Pedoman komunitas ↗
-      </a>
-      <a href="#faq" class="block hover:text-ink transition-colors">
+      </router-link>
+      <router-link to="/bantuan" class="block hover:text-ink transition-colors">
         Bantuan & FAQ
-      </a>
-      <a href="#changelog" class="block hover:text-ink transition-colors">
-        Catatan pembaruan
-      </a>
+      </router-link>
+      <router-link to="/privasi" class="block hover:text-ink transition-colors">
+        Kebijakan privasi
+      </router-link>
     </div>
 
     <!-- Info Privasi (Sesuai Figma) -->

@@ -14,7 +14,7 @@ const mockComments: Comment[] = [];
 // Map untuk melacak user voting: key = `${postId}_${userId}`, value = 'up' | 'down'
 const mockUserVotes: Map<string, 'up' | 'down'> = new Map();
 
-// Seed initial post sesuai migration 001
+// Seed initial post bersih (tanpa komentar dummy & tanpa vote dummy)
 const initialPinnedPost: Post = {
   id: '10000000-0000-0000-0000-000000000001',
   user_id: '00000000-0000-0000-0000-000000000002',
@@ -24,42 +24,18 @@ const initialPinnedPost: Post = {
   ai_score: 0.02,
   status: 'approved',
   is_boosted: true,
-  upvotes_count: 42,
+  upvotes_count: 0,
   extra_meta: {
     category_pill: 'Info kampus',
     is_superchat: true,
   },
-  created_at: new Date('2026-10-18T08:00:00Z').toISOString(),
+  created_at: new Date().toISOString(),
 };
 
 mockPosts.set(initialPinnedPost.id, initialPinnedPost);
 
-// Tambahan post demo
-const demoPost2: Post = {
-  id: '10000000-0000-0000-0000-000000000002',
-  user_id: '00000000-0000-0000-0000-000000000002',
-  kategori: 'menfess',
-  teks_konten: 'Buat yang tadi sore ketinggalan tumbler Corkcicle warna biru di Gedung Kuliah Bersama Lantai 3, udah dititip ke satpam ya!',
-  media_url: null,
-  ai_score: 0.01,
-  status: 'approved',
-  is_boosted: false,
-  upvotes_count: 15,
-  extra_meta: {
-    category_pill: 'Curhat',
-  },
-  created_at: new Date(Date.now() - 3600000).toISOString(),
-};
-mockPosts.set(demoPost2.id, demoPost2);
-
-// Seed komentar awal
-mockComments.push({
-  id: crypto.randomUUID(),
-  post_id: initialPinnedPost.id,
-  user_id: '00000000-0000-0000-0000-000000000001',
-  isi_komentar: 'Keren banget platformnya, semoga makin bermanfaat buat anak kampus!',
-  created_at: new Date(Date.now() - 1800000).toISOString(),
-});
+// Komentar awal kosong murni untuk pengujian manual mandiri
+// mockComments dibiarkan array kosong []
 
 export interface FindPostsOptions {
   kategori?: PostCategory;
@@ -122,7 +98,7 @@ export class PostRepository {
    */
   static async findAll(options: FindPostsOptions = {}): Promise<{ posts: PostWithMeta[]; total: number }> {
     const {
-      kategori = 'menfess',
+      kategori,
       status = 'approved',
       page = 1,
       limit = 20,
@@ -133,9 +109,16 @@ export class PostRepository {
     if (isSupabaseConfigured) {
       let query = supabase
         .from('posts')
-        .select('*, comments(count)', { count: 'exact' })
-        .eq('kategori', kategori)
-        .eq('status', status)
+        .select('*, comments(count)', { count: 'exact' });
+
+      if (kategori) {
+        query = query.eq('kategori', kategori);
+      }
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      query = query
         .order('is_boosted', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -217,6 +200,34 @@ export class PostRepository {
     }
 
     return mockPosts.get(id) || null;
+  }
+
+  /**
+   * Memperbarui postingan (misal status atau extra_meta)
+   */
+  static async update(id: string, updates: Partial<Post>): Promise<Post | null> {
+    const post = await this.findById(id);
+    if (!post) return null;
+
+    const updatedPost: Post = {
+      ...post,
+      ...updates,
+      extra_meta: {
+        ...(post.extra_meta || {}),
+        ...(updates.extra_meta || {})
+      }
+    };
+
+    mockPosts.set(id, updatedPost);
+
+    if (isSupabaseConfigured) {
+      await supabase
+        .from('posts')
+        .update(updates)
+        .eq('id', id);
+    }
+
+    return updatedPost;
   }
 
   /**

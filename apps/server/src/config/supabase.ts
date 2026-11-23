@@ -3,10 +3,16 @@ import { ENV } from './env.js';
 
 export const isSupabaseConfigured = Boolean(
   ENV.SUPABASE_URL && 
-  ENV.SUPABASE_URL !== 'https://demo-placeholder.supabase.co' &&
+  !ENV.SUPABASE_URL.includes('your-project') &&
+  !ENV.SUPABASE_URL.includes('demo-placeholder') &&
   ENV.SUPABASE_ANON_KEY &&
+  !ENV.SUPABASE_ANON_KEY.includes('your-supabase') &&
   ENV.SUPABASE_ANON_KEY !== 'demo-anon-key'
 );
+
+// Dummy WebSocket implementation to prevent @supabase/realtime-js
+// from throwing "native WebSocket not found" on Node 20 LTS
+class NodeWebSocketAdapter {}
 
 let _supabaseClient: SupabaseClient | null = null;
 
@@ -17,10 +23,9 @@ export function getSupabase(): SupabaseClient {
       ENV.SUPABASE_SERVICE_ROLE_KEY || ENV.SUPABASE_ANON_KEY,
       {
         auth: { persistSession: false },
-        // Hindari dependensi WebSocket native Node 22 pada Node 20 LTS
         realtime: {
-          createWebSocket: () => null
-        } as any
+          transport: NodeWebSocketAdapter as any,
+        }
       }
     );
   }

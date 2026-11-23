@@ -1,19 +1,28 @@
+// =====================================================================
+// ADMIN ROUTES - MENFESSIN AJA
+// Rute khusus Administrator (SDD 1.2 & SRS FR-006, FR-007)
+// =====================================================================
+
 import { Hono } from 'hono';
+import { AdminController } from '../controllers/admin.controller.js';
+import { requireAdmin, requireAuth } from '../middlewares/auth.middleware.js';
 
 export const adminRouter = new Hono();
 
-adminRouter.get('/posts/flagged', (c) => {
-  return c.json({ message: 'Admin flagged queue endpoint siap untuk Sprint 5' });
-});
+// Seluruh rute admin wajib otentikasi JWT dan ber-role admin
+adminRouter.use('*', requireAuth, requireAdmin);
 
-adminRouter.post('/posts/moderate', (c) => {
-  return c.json({ message: 'Admin moderate post endpoint siap untuk Sprint 5' });
-});
+// Antrean konten mencurigakan / flagged
+adminRouter.get('/posts/flagged', AdminController.getFlaggedPosts);
 
-adminRouter.get('/transactions', (c) => {
-  return c.json({ message: 'Admin transaction logs endpoint siap untuk Sprint 5' });
-});
+// Aksi moderasi (Setujui / Tolak) & penulisan audit log
+adminRouter.post('/posts/moderate', AdminController.moderatePost);
 
-adminRouter.post('/users/ban', (c) => {
-  return c.json({ message: 'Admin ban user endpoint siap untuk Sprint 5' });
-});
+// Log audit moderasi permanen
+adminRouter.get('/logs', AdminController.getAuditLogs);
+
+// Pemblokiran akun pengguna (User Ban)
+adminRouter.post('/users/ban', AdminController.banUser);
+
+// Ringkasan metrik statistik dasbor
+adminRouter.get('/stats', AdminController.getStats);

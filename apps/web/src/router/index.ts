@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
 import AdminDashboardView from '../views/AdminDashboardView.vue';
+import HelpView from '../views/HelpView.vue';
 import LoginView from '../views/LoginView.vue';
 import LostFoundView from '../views/LostFoundView.vue';
 import MarketplaceView from '../views/MarketplaceView.vue';
@@ -46,6 +47,28 @@ const router = createRouter({
       name: 'admin',
       component: AdminDashboardView,
       meta: { title: 'Dasbor Moderasi Admin', requiresAdmin: true }
+    },
+    {
+      path: '/bantuan',
+      name: 'help',
+      component: HelpView,
+      meta: { title: 'Pusat Bantuan & FAQ' }
+    },
+    {
+      path: '/faq',
+      redirect: '/bantuan'
+    },
+    {
+      path: '/pedoman',
+      name: 'guidelines',
+      component: HelpView,
+      meta: { title: 'Pedoman Komunitas' }
+    },
+    {
+      path: '/privasi',
+      name: 'privacy',
+      component: HelpView,
+      meta: { title: 'Kebijakan Privasi' }
     }
   ],
   scrollBehavior() {

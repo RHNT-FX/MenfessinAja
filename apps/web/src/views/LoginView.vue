@@ -1,12 +1,11 @@
 <script setup lang="ts">
+import TurnstileWidget from '@/components/common/TurnstileWidget.vue';
 import { useAuthStore } from '@/stores/auth';
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
   Eye,
   EyeOff,
-  ShieldCheck
 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -20,6 +19,7 @@ const loginPassword = ref('password123');
 const showLoginPassword = ref(false);
 const rememberMe = ref(true);
 const loginError = ref('');
+const loginTurnstileToken = ref('demo-turnstile-token');
 
 // Register state
 const regEmail = ref('');
@@ -29,16 +29,21 @@ const showRegPassword = ref(false);
 const agreePolicy = ref(true);
 const regError = ref('');
 const regSuccess = ref('');
+const regTurnstileToken = ref('demo-turnstile-token');
 
 async function handleLogin() {
   if (!loginEmail.value || !loginPassword.value) {
     loginError.value = 'Silakan lengkapi email dan kata sandi';
     return;
   }
+  if (!loginTurnstileToken.value) {
+    loginError.value = 'Silakan selesaikan verifikasi Cloudflare Turnstile';
+    return;
+  }
   loginError.value = '';
 
   try {
-    const user = await authStore.login(loginEmail.value, loginPassword.value, 'demo-turnstile-token');
+    const user = await authStore.login(loginEmail.value, loginPassword.value, loginTurnstileToken.value);
     if (user.role === 'admin') {
       router.push('/admin');
     } else {
@@ -62,10 +67,14 @@ async function handleRegister() {
     regError.value = 'Anda harus menyetujui pedoman komunitas';
     return;
   }
+  if (!regTurnstileToken.value) {
+    regError.value = 'Silakan selesaikan verifikasi Cloudflare Turnstile';
+    return;
+  }
   regError.value = '';
 
   try {
-    await authStore.register(regEmail.value, regPassword.value, 'demo-turnstile-token');
+    await authStore.register(regEmail.value, regPassword.value, regTurnstileToken.value);
     regSuccess.value = 'Akun berhasil dibuat! Mengalihkan ke beranda...';
     setTimeout(() => {
       router.push('/');
@@ -111,10 +120,10 @@ async function handleRegister() {
           <p class="text-xs text-blue-100 leading-relaxed font-light">
             Identitas asli tidak tampil di feed. Namun, admin tetap dapat meninjau dan memblokir akun yang melanggar pedoman. Anonim bukan berarti bebas menyakiti.
           </p>
-          <a href="#batas" class="inline-flex items-center gap-1 text-xs font-semibold text-white underline hover:text-blue-100">
+          <router-link to="/pedoman" class="inline-flex items-center gap-1 text-xs font-semibold text-white underline hover:text-blue-100">
             <span>Kenali batasnya</span>
             <span>↗</span>
-          </a>
+          </router-link>
         </div>
 
         <!-- Quick Demo Hint -->
@@ -137,7 +146,7 @@ async function handleRegister() {
         </div>
 
         <div class="text-xs text-ink-muted">
-          Kesulitan masuk? <a href="#faq" class="text-ink hover:underline">Bantuan & FAQ ↗</a>
+          Kesulitan masuk? <router-link to="/bantuan" class="text-ink hover:underline font-semibold">Bantuan & FAQ ↗</router-link>
         </div>
       </div>
 
@@ -199,24 +208,13 @@ async function handleRegister() {
               <input v-model="rememberMe" type="checkbox" class="accent-primary" />
               <span>Ingat saya</span>
             </label>
-            <a href="#lupa" class="text-primary hover:underline text-[11px]">
+            <router-link to="/bantuan" class="text-primary hover:underline text-[11px]">
               Lupa kata sandi?
-            </a>
+            </router-link>
           </div>
 
-          <!-- Cloudflare Turnstile Placeholder (Sesuai Figma) -->
-          <div class="p-3 bg-surface border border-border rounded-sm flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <ShieldCheck class="w-4 h-4 text-primary" />
-              <div>
-                <div class="font-semibold text-ink text-[11px]">Verifikasi manusia</div>
-                <div class="text-[10px] text-ink-muted">Cloudflare Turnstile · placeholder demo</div>
-              </div>
-            </div>
-            <span class="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
-              <CheckCircle2 class="w-3.5 h-3.5" /> Terverifikasi
-            </span>
-          </div>
+          <!-- Cloudflare Turnstile Verification Widget -->
+          <TurnstileWidget v-model="loginTurnstileToken" />
 
           <!-- Login Button -->
           <button
@@ -317,22 +315,17 @@ async function handleRegister() {
           <!-- Terms Checkbox -->
           <label class="flex items-start gap-2 cursor-pointer text-xs text-ink leading-snug select-none pt-1">
             <input v-model="agreePolicy" type="checkbox" class="accent-primary mt-0.5" />
-            <span>Saya setuju dengan Pedoman Komunitas dan Kebijakan Privasi Menfessin Aja.</span>
+            <span>
+              Saya setuju dengan 
+              <router-link to="/pedoman" target="_blank" class="text-primary underline">Pedoman Komunitas</router-link> 
+              dan 
+              <router-link to="/privasi" target="_blank" class="text-primary underline">Kebijakan Privasi</router-link> 
+              Menfessin Aja.
+            </span>
           </label>
 
-          <!-- Turnstile Placeholder -->
-          <div class="p-3 bg-surface border border-border rounded-sm flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <ShieldCheck class="w-4 h-4 text-primary" />
-              <div>
-                <div class="font-semibold text-ink text-[11px]">Verifikasi manusia</div>
-                <div class="text-[10px] text-ink-muted">Cloudflare Turnstile · placeholder demo</div>
-              </div>
-            </div>
-            <span class="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
-              <CheckCircle2 class="w-3.5 h-3.5" /> Terverifikasi
-            </span>
-          </div>
+          <!-- Cloudflare Turnstile Verification Widget -->
+          <TurnstileWidget v-model="regTurnstileToken" />
 
           <!-- Register Button -->
           <button

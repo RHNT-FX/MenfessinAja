@@ -1,97 +1,202 @@
 <script setup lang="ts">
 import AppSidebar from '@/components/layout/AppSidebar.vue';
+import TurnstileWidget from '@/components/common/TurnstileWidget.vue';
+import { useAuthStore } from '@/stores/auth';
+import { apiFetch } from '@/utils/api';
 import {
-  CheckCircle2,
+  Image as ImageIcon,
+  Loader2,
   Search,
-  ShieldCheck
+  X
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { compressImageToWebp } from '@/utils/imageCompressor';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+interface LostFoundItem {
+  id: string;
+  tipe: 'Ditemukan' | 'Hilang' | 'Selesai';
+  title: string;
+  location: string;
+  time: string;
+  description: string;
+  image: string;
+  actionText: string;
+  isResolved: boolean;
+}
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const searchQuery = ref('');
 const activeFilter = ref<'Semua' | 'Hilang' | 'Ditemukan' | 'Selesai'>('Semua');
 const reportType = ref<'ditemukan' | 'hilang'>('ditemukan');
 
-const formNamaBarang = ref('Kunci + gantungan bebek');
-const formLokasi = ref('Kantin, meja dekat jendela');
-const formWaktu = ref('12 Okt 2026 / 11.40 WIB');
-const formCiri = ref('Gantungan bebek kuning. Sudah dititipkan di pos keamanan.');
+const formNamaBarang = ref('');
+const formLokasi = ref('');
+const formWaktu = ref('');
+const formCiri = ref('');
+const formWa = ref('');
+const turnstileToken = ref('demo-turnstile-token');
+const isSubmitting = ref(false);
 const isSubmitted = ref(false);
 
-const reports = ref([
-  {
-    id: 'lf-1',
-    tipe: 'Ditemukan',
-    title: 'Kunci + gantungan bebek',
-    location: 'Kantin, meja dekat jendela',
-    time: '12 Okt 2026 · 11.40',
-    description: 'Ditemukan setelah jam makan siang. Sudah dititipkan di pos keamanan. Sebutkan ciri kunci saat mengambil.',
-    image: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&auto=format&fit=crop&q=80',
-    actionText: 'Ini mungkin punya saya ↗',
-    isResolved: false
-  },
-  {
-    id: 'lf-2',
-    tipe: 'Hilang',
-    title: 'Dompet cokelat kecil',
-    location: 'Sekitar perpustakaan',
-    time: '12 Okt 2026 · 09.00',
-    description: 'Terakhir dipakai pagi tadi. Ada jahitan lepas di sudut. Kalau menemukan, kabari lewat laporan ini ya.',
-    image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=400&auto=format&fit=crop&q=80',
-    actionText: 'Saya menemukan barang ini ↗',
-    isResolved: false
-  },
-  {
-    id: 'lf-3',
-    tipe: 'Ditemukan',
-    title: 'Botol minum biru',
-    location: 'Ruang baca lantai 2',
-    time: '11 Okt 2026 · 16.20',
-    description: 'Masih ada airnya. Dititipkan ke petugas perpustakaan; tunjukkan bukti kepemilikan untuk mengambil.',
-    image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&auto=format&fit=crop&q=80',
-    actionText: 'Ini mungkin punya saya ↗',
-    isResolved: false
-  },
-  {
-    id: 'lf-4',
-    tipe: 'Selesai',
-    title: 'Earbuds dalam case putih',
-    location: 'Taman kampus',
-    time: '11 Okt 2026 · 14.10',
-    description: 'Sudah kembali ke pemiliknya. Terima kasih yang ikut bantu sebarkan!',
-    image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80',
-    actionText: '✓ Sudah kembali ke pemilik',
-    isResolved: true
+// WebP image compression state (SRS 1.3.3 & NFR-001)
+const imagePreview = ref('');
+const imageCompressionInfo = ref<{ originalKb: number; compressedKb: number; reduction: number } | null>(null);
+const isCompressing = ref(false);
+
+async function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (!target.files || target.files.length === 0) return;
+  const file = target.files[0];
+  isCompressing.value = true;
+  try {
+    const res = await compressImageToWebp(file, 100);
+    imagePreview.value = res.dataUrl;
+    imageCompressionInfo.value = {
+      originalKb: res.originalSizeKb,
+      compressedKb: res.compressedSizeKb,
+      reduction: res.reductionPercentage
+    };
+  } catch (err: any) {
+    alert(err.message || 'Gagal mengompresi gambar');
+  } finally {
+    isCompressing.value = false;
   }
-]);
+}
+
+function removeImage() {
+  imagePreview.value = '';
+  imageCompressionInfo.value = null;
+}
+
+const reports = ref<LostFoundItem[]>([]);
+const isLoading = ref(false);
+const errorMsg = ref('');
+
+onMounted(() => {
+  loadReports();
+});
+
+async function loadReports() {
+  isLoading.value = true;
+  errorMsg.value = '';
+  try {
+    const res = await apiFetch('/api/posts', {
+      params: { kategori: 'lost_found' }
+    });
+    if (res.success && res.data?.items) {
+      reports.value = res.data.items.map((item: any) => {
+        const isResolved = item.status === 'resolved' || item.extra_meta?.is_resolved;
+        const tipeRaw = item.extra_meta?.tipe_laporan === 'hilang' ? 'Hilang' : 'Ditemukan';
+        const tipe = isResolved ? 'Selesai' : tipeRaw;
+
+        return {
+          id: item.id,
+          tipe,
+          title: item.extra_meta?.judul || 'Laporan Barang',
+          location: item.extra_meta?.lokasi || 'Kampus',
+          time: new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+          description: item.teks_konten,
+          image: item.media_url || 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&auto=format&fit=crop&q=80',
+          actionText: isResolved
+            ? '✓ Sudah diselesaikan'
+            : tipeRaw === 'Ditemukan'
+            ? 'Ini mungkin punya saya ↗'
+            : 'Saya menemukan barang ini ↗',
+          isResolved
+        };
+      });
+    }
+  } catch (err: any) {
+    errorMsg.value = err.message || 'Gagal memuat laporan';
+  } finally {
+    isLoading.value = false;
+  }
+}
 
 const filteredReports = computed(() => {
-  return reports.value.filter(r => {
+  return reports.value.filter((r) => {
     const matchFilter = activeFilter.value === 'Semua' || r.tipe === activeFilter.value;
-    const matchSearch = !searchQuery.value || r.title.toLowerCase().includes(searchQuery.value.toLowerCase()) || r.description.toLowerCase().includes(searchQuery.value.toLowerCase());
+    const matchSearch =
+      !searchQuery.value ||
+      r.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      r.description.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      r.location.toLowerCase().includes(searchQuery.value.toLowerCase());
     return matchFilter && matchSearch;
   });
 });
 
-function handleSubmitReport() {
-  if (!formNamaBarang.value.trim()) return;
+async function handleSubmitReport() {
+  if (!formNamaBarang.value.trim() || !formLokasi.value.trim() || !formCiri.value.trim() || isSubmitting.value) return;
 
-  const newReport = {
-    id: `lf-${Date.now()}`,
-    tipe: reportType.value === 'ditemukan' ? 'Ditemukan' : 'Hilang',
-    title: formNamaBarang.value,
-    location: formLokasi.value || 'Sekitar kampus',
-    time: 'Hari ini · Baru saja',
-    description: formCiri.value,
-    image: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&auto=format&fit=crop&q=80',
-    actionText: reportType.value === 'ditemukan' ? 'Ini mungkin punya saya ↗' : 'Saya menemukan barang ini ↗',
-    isResolved: false
-  };
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
 
-  reports.value.unshift(newReport);
-  isSubmitted.value = true;
-  setTimeout(() => {
-    isSubmitted.value = false;
-  }, 2000);
+  isSubmitting.value = true;
+  try {
+    const res = await apiFetch('/api/posts/lost_found', {
+      method: 'POST',
+      body: JSON.stringify({
+        judul: formNamaBarang.value,
+        lokasi: formLokasi.value,
+        tipe_laporan: reportType.value,
+        deskripsi: formCiri.value + (formWaktu.value ? ` (Waktu: ${formWaktu.value})` : ''),
+        whatsapp: formWa.value,
+        media_url: imagePreview.value || undefined
+      })
+    });
+
+    if (res.success && res.data) {
+      const newReport: LostFoundItem = {
+        id: res.data.id,
+        tipe: reportType.value === 'ditemukan' ? 'Ditemukan' : 'Hilang',
+        title: formNamaBarang.value,
+        location: formLokasi.value,
+        time: 'Hari ini · Baru saja',
+        description: res.data.teks_konten,
+        image: res.data.media_url || 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&auto=format&fit=crop&q=80',
+        actionText: reportType.value === 'ditemukan' ? 'Ini mungkin punya saya ↗' : 'Saya menemukan barang ini ↗',
+        isResolved: false
+      };
+      reports.value.unshift(newReport);
+      isSubmitted.value = true;
+
+      // Reset form
+      formNamaBarang.value = '';
+      formLokasi.value = '';
+      formWaktu.value = '';
+      formCiri.value = '';
+      formWa.value = '';
+      removeImage();
+
+      setTimeout(() => {
+        isSubmitted.value = false;
+      }, 3000);
+    }
+  } catch (err: any) {
+    alert(err.message || 'Gagal mengirim laporan');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+async function handleResolve(item: LostFoundItem) {
+  try {
+    const res = await apiFetch(`/api/posts/${item.id}/resolve`, {
+      method: 'PUT'
+    });
+    if (res.success) {
+      item.isResolved = true;
+      item.tipe = 'Selesai';
+      item.actionText = '✓ Sudah diselesaikan';
+    }
+  } catch (err: any) {
+    alert(err.message || 'Gagal menandai laporan selesai');
+  }
 }
 </script>
 
@@ -141,8 +246,19 @@ function handleSubmitReport() {
         </button>
       </div>
 
+      <!-- Loading State -->
+      <div v-if="isLoading" class="p-12 text-center text-ink-muted text-xs flex flex-col items-center gap-2">
+        <Loader2 class="w-5 h-5 animate-spin text-primary" />
+        <span>Memuat papan barang hilang & ditemukan...</span>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="errorMsg" class="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-sm mb-4">
+        {{ errorMsg }}
+      </div>
+
       <!-- 2-Column Layout: Reports List (Left) & Create Form (Right) (Sesuai Figma 09) -->
-      <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+      <div v-else class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
         <!-- Left: Reports Feed -->
         <div class="xl:col-span-7 space-y-4">
           <div class="flex items-center justify-between text-xs text-ink-muted font-medium mb-2">
@@ -151,6 +267,12 @@ function handleSubmitReport() {
               <span>Terbaru</span>
               <span>↓</span>
             </button>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="filteredReports.length === 0" class="p-12 text-center bg-surface border border-dashed border-border rounded-sm text-xs text-ink-muted">
+            <p class="font-medium text-ink mb-1">Belum ada laporan barang di kategori ini.</p>
+            <p>Jika kamu kehilangan atau menemukan barang di area kampus, buat laporan di form sebelah kanan.</p>
           </div>
 
           <!-- Report Cards List -->
@@ -175,8 +297,8 @@ function handleSubmitReport() {
                   <span
                     class="px-2 py-0.5 rounded-xs font-bold text-[10px] uppercase"
                     :class="[
-                      item.tipe === 'Ditemukan' ? 'bg-badge-foundBg text-badge-foundText' : '',
-                      item.tipe === 'Hilang' ? 'bg-badge-lostBg text-badge-lostText' : '',
+                      item.tipe === 'Ditemukan' ? 'bg-emerald-100 text-emerald-800' : '',
+                      item.tipe === 'Hilang' ? 'bg-amber-100 text-amber-900' : '',
                       item.tipe === 'Selesai' ? 'bg-surface-muted text-ink-muted' : ''
                     ]"
                   >
@@ -211,7 +333,8 @@ function handleSubmitReport() {
                 </span>
                 <button
                   v-else
-                  class="font-semibold text-primary hover:underline text-xs"
+                  @click="handleResolve(item)"
+                  class="font-semibold text-primary hover:underline text-xs cursor-pointer"
                 >
                   {{ item.actionText }}
                 </button>
@@ -222,147 +345,151 @@ function handleSubmitReport() {
               </div>
             </div>
           </article>
-
-          <!-- Load More Button -->
-          <div class="text-center pt-2">
-            <button class="w-full py-2.5 bg-surface border border-border text-xs font-semibold text-ink hover:bg-surface-muted transition-colors rounded-sm inline-flex items-center justify-center gap-1.5">
-              <span>Lihat laporan lainnya</span>
-              <span>↓</span>
-            </button>
-          </div>
         </div>
 
         <!-- Right: Create Report Form (Sesuai Figma 09) -->
-        <div class="xl:col-span-5 bg-surface border border-border p-5 rounded-sm space-y-4">
-          <div>
-            <h2 class="font-serif text-2xl text-ink font-normal mb-1">
-              Bantu barang pulang.
+        <div class="xl:col-span-5 bg-surface border border-border p-6 rounded-sm shadow-xs sticky top-24">
+          <div class="mb-4">
+            <div class="text-[11px] font-semibold text-ink-muted tracking-wider uppercase mb-1">
+              LAPORKAN SEKARANG
+            </div>
+            <h2 class="font-serif text-2xl text-ink font-normal">
+              Kehilangan atau nemu barang?
             </h2>
-            <p class="text-xs text-ink-muted leading-relaxed">
-              Buat laporan baru. Jangan tampilkan identitas pada kartu, dokumen, atau layar perangkat.
+            <p class="text-xs text-ink-muted mt-1 leading-relaxed">
+              Tulis ciri yang jelas agar pemilik atau penemu mudah mengenali barang tersebut.
             </p>
           </div>
 
-          <!-- Type Selector: Ditemukan / Hilang -->
-          <div class="flex items-center gap-6 border-b border-border pb-2 text-xs font-semibold">
+          <!-- Type Selector (Radio Toggle) -->
+          <div class="grid grid-cols-2 gap-2 mb-4">
             <button
+              type="button"
               @click="reportType = 'ditemukan'"
-              class="pb-1 transition-colors"
-              :class="reportType === 'ditemukan' ? 'text-ink border-b-2 border-ink' : 'text-ink-muted hover:text-ink'"
+              class="py-2 px-3 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5"
+              :class="reportType === 'ditemukan' ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-ink hover:bg-surface-muted'"
             >
-              Ditemukan
+              <span>Saya menemukan</span>
             </button>
             <button
+              type="button"
               @click="reportType = 'hilang'"
-              class="pb-1 transition-colors"
-              :class="reportType === 'hilang' ? 'text-ink border-b-2 border-ink' : 'text-ink-muted hover:text-ink'"
+              class="py-2 px-3 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5"
+              :class="reportType === 'hilang' ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-ink hover:bg-surface-muted'"
             >
-              Hilang
+              <span>Saya kehilangan</span>
             </button>
           </div>
 
-          <!-- Form Fields -->
-          <div class="space-y-3 text-xs">
+          <form @submit.prevent="handleSubmitReport" class="space-y-3.5 text-xs">
             <div>
-              <label class="block font-semibold text-ink mb-1">Nama barang *</label>
+              <label class="block font-semibold text-ink mb-1">Nama Barang *</label>
               <input
                 v-model="formNamaBarang"
                 type="text"
-                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-medium"
-              />
-            </div>
-
-            <div>
-              <label class="block font-semibold text-ink mb-1">
-                {{ reportType === 'ditemukan' ? 'Lokasi ditemukan *' : 'Lokasi terakhir *' }}
-              </label>
-              <input
-                v-model="formLokasi"
-                type="text"
+                required
+                placeholder="Contoh: Dompet cokelat, Kunci motor..."
                 class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
               />
             </div>
 
             <div>
-              <label class="block font-semibold text-ink mb-1">Tanggal & waktu *</label>
+              <label class="block font-semibold text-ink mb-1">Lokasi kejadian *</label>
               <input
-                v-model="formWaktu"
+                v-model="formLokasi"
                 type="text"
-                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono text-[11px]"
+                required
+                placeholder="Contoh: Kantin gedung A, Ruang baca perpus..."
+                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
               />
             </div>
 
-            <!-- Photo Upload Box (WebP < 100 KB sesuai SRS & Figma) -->
-            <div>
-              <label class="block font-semibold text-ink mb-1">Foto barang</label>
-              <div class="border border-border p-3 rounded-sm flex items-center gap-3 bg-canvas/40">
-                <div class="w-12 h-12 bg-surface rounded-xs overflow-hidden border border-border shrink-0">
-                  <img
-                    src="https://images.unsplash.com/photo-1582139329536-e7284fece509?w=100&auto=format&fit=crop&q=80"
-                    alt="kunci"
-                    class="w-full h-full object-cover"
-                  />
-                </div>
-                <div class="flex-1 text-[11px]">
-                  <div class="font-bold text-ink">kunci.webp · 82 KB</div>
-                  <div class="text-primary font-medium cursor-pointer hover:underline">
-                    Ganti foto / Hapus lampiran
-                  </div>
-                  <div class="text-ink-muted text-[10px]">WebP otomatis · maksimal 100 KB</div>
-                </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-ink mb-1">Waktu (Opsional)</label>
+                <input
+                  v-model="formWaktu"
+                  type="text"
+                  placeholder="Contoh: Tadi siang 13.00"
+                  class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
+                />
+              </div>
+              <div>
+                <label class="block font-semibold text-ink mb-1">No WA Kontak (Opsional)</label>
+                <input
+                  v-model="formWa"
+                  type="text"
+                  placeholder="081234567890"
+                  class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink font-mono"
+                />
               </div>
             </div>
 
             <div>
-              <label class="block font-semibold text-ink mb-1">Ciri & tempat penitipan *</label>
+              <label class="block font-semibold text-ink mb-1">Ciri-ciri & Keterangan Tambahan *</label>
               <textarea
                 v-model="formCiri"
                 rows="3"
-                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink text-xs leading-relaxed"
+                required
+                placeholder="Ciri unik, warna, gantungan, atau tempat barang dititipkan..."
+                class="w-full p-2.5 bg-surface border border-border rounded-sm focus:outline-none focus:border-ink"
               ></textarea>
-              <p class="text-[10px] text-ink-muted mt-1">
-                Simpan satu ciri khusus untuk memverifikasi pemilik.
-              </p>
             </div>
 
-            <!-- Turnstile Placeholder -->
-            <div class="p-3 bg-canvas border border-border rounded-sm flex items-center justify-between text-xs">
-              <div class="flex items-center gap-2">
-                <ShieldCheck class="w-4 h-4 text-primary" />
-                <div>
-                  <div class="font-semibold text-ink text-[11px]">Verifikasi manusia</div>
-                  <div class="text-[10px] text-ink-muted">Cloudflare Turnstile · placeholder demo</div>
+            <!-- WebP Image Upload Section (SRS 1.3.3 & NFR-001) -->
+            <div>
+              <label class="block font-semibold text-ink mb-1">Foto Barang (Opsional)</label>
+              <div v-if="imagePreview" class="relative w-full h-36 bg-canvas border border-border rounded-sm overflow-hidden mb-2">
+                <img :src="imagePreview" alt="Preview WebP" class="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  @click="removeImage"
+                  class="absolute top-2 right-2 p-1 bg-black/70 text-white rounded-full hover:bg-black transition-colors"
+                  title="Hapus foto"
+                >
+                  <X class="w-3.5 h-3.5" />
+                </button>
+                <div v-if="imageCompressionInfo" class="absolute bottom-2 left-2 px-2 py-0.5 bg-emerald-700 text-white text-[10px] font-bold rounded-xs shadow-xs">
+                  ✓ WebP • {{ imageCompressionInfo.compressedKb }} KB (Hemat {{ imageCompressionInfo.reduction }}%)
                 </div>
               </div>
-              <span class="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
-                <CheckCircle2 class="w-3.5 h-3.5" /> Terverifikasi
-              </span>
+
+              <div v-else>
+                <label class="cursor-pointer border border-dashed border-border hover:border-ink/50 rounded-sm p-3 text-center block transition-colors bg-surface">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="hidden"
+                    @change="handleFileSelect"
+                  />
+                  <div class="flex flex-col items-center gap-1 text-ink-muted">
+                    <Loader2 v-if="isCompressing" class="w-4 h-4 animate-spin text-primary" />
+                    <ImageIcon v-else class="w-4 h-4 text-ink-muted" />
+                    <span class="text-[11px] font-medium text-ink">
+                      {{ isCompressing ? 'Mengompresi ke WebP...' : 'Pilih Foto Barang' }}
+                    </span>
+                    <span class="text-[10px] text-ink-muted">Otomatis WebP ≤100 KB</span>
+                  </div>
+                </label>
+              </div>
             </div>
 
-            <!-- Submit Button -->
+            <!-- Cloudflare Turnstile Verification Widget -->
+            <TurnstileWidget v-model="turnstileToken" />
+
+            <div v-if="isSubmitted" class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-sm">
+              ✓ Laporan berhasil dipublikasikan ke papan Lost & Found!
+            </div>
+
             <button
-              @click="handleSubmitReport"
-              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all shadow-xs"
+              type="submit"
+              :disabled="isSubmitting || !formNamaBarang.trim()"
+              class="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-semibold py-2.5 px-4 rounded-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
-              Kirim laporan untuk ditinjau
+              <Loader2 v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" />
+              <span>Publikasikan Laporan</span>
             </button>
-
-            <div v-if="isSubmitted" class="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-sm">
-              ✓ Laporan berhasil dikirim dan diverifikasi!
-            </div>
-          </div>
-
-          <!-- Bottom Notice: Setelah barang kembali (Sesuai Figma 09) -->
-          <div class="pt-4 border-t border-border space-y-3">
-            <div class="p-3.5 bg-primary-soft rounded-xs text-xs text-ink leading-relaxed">
-              <span class="font-bold text-primary block mb-0.5">Setelah barang kembali</span>
-              Pemilik laporan bisa menandai Selesai. Cocokkan ciri barang secara privat sebelum serah terima.
-            </div>
-
-            <button class="w-full py-2 bg-surface border border-border text-ink hover:bg-surface-muted text-xs font-semibold rounded-sm transition-colors">
-              Tandai laporan saya selesai
-            </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>
