@@ -212,7 +212,7 @@ export class PostController {
    */
   static async resolvePost(c: Context) {
     try {
-      const postId = c.req.param('id');
+      const postId = c.req.param('id') || '';
       const updated = await PostService.resolvePost(postId);
       if (!updated) {
         return c.json({ success: false, error: 'Postingan tidak ditemukan' }, 404);
@@ -239,7 +239,7 @@ export class PostController {
         return c.json({ success: false, error: 'Otentikasi diperlukan' }, 401);
       }
 
-      const postId = c.req.param('id');
+      const postId = c.req.param('id') || '';
       const body = await c.req.json();
       const voteType = body.type === 'down' ? 'down' : 'up';
 
@@ -261,7 +261,7 @@ export class PostController {
    */
   static async getComments(c: Context) {
     try {
-      const postId = c.req.param('id');
+      const postId = c.req.param('id') || '';
       const comments = await PostService.getComments(postId);
 
       return c.json({
@@ -284,7 +284,7 @@ export class PostController {
         return c.json({ success: false, error: 'Otentikasi diperlukan' }, 401);
       }
 
-      const postId = c.req.param('id');
+      const postId = c.req.param('id') || '';
       const body = await c.req.json();
       const parseResult = CreateCommentSchema.safeParse(body);
       if (!parseResult.success) {

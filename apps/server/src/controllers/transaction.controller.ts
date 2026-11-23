@@ -85,7 +85,7 @@ export class TransactionController {
    */
   static async getStatus(c: Context) {
     try {
-      const orderId = c.req.param('orderId');
+      const orderId = c.req.param('orderId') || '';
       const result = await TransactionService.getTransactionStatus(orderId);
 
       if (!result.transaction) {
@@ -113,7 +113,7 @@ export class TransactionController {
    */
   static async simulatePayment(c: Context) {
     try {
-      const orderId = c.req.param('orderId');
+      const orderId = c.req.param('orderId') || '';
       const result = await TransactionService.simulatePayment(orderId);
 
       return c.json({

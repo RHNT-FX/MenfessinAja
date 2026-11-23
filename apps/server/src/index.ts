@@ -42,11 +42,13 @@ app.notFound((c) => {
   }, 404);
 });
 
-// Start Server
-console.log(`🚀 [Menfessin Aja API] Menjalankan peladen Hono pada port ${ENV.PORT}...`);
-serve({
-  fetch: app.fetch,
-  port: ENV.PORT
-});
+// Start Server (Hanya dijalankan jika bukan lingkungan serverless seperti Vercel)
+if (!process.env.VERCEL) {
+  console.log(`🚀 [Menfessin Aja API] Menjalankan peladen Hono pada port ${ENV.PORT}...`);
+  serve({
+    fetch: app.fetch,
+    port: ENV.PORT
+  });
+}
 
 export default app;
