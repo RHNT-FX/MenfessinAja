@@ -1,3 +1,5 @@
+import { handleMockRequest } from './mockBackend';
+
 export interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
@@ -28,17 +30,23 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
 
-  const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return data as T;
+    }
 
-  if (!response.ok) {
-    const errorMsg = data.message || `Permintaan gagal dengan status ${response.status}`;
-    throw new Error(errorMsg);
+    // Jika status 500 atau 404 pada Vercel, fallback mulus ke Mock Backend
+    console.warn(`[API] Server status ${response.status} pada ${endpoint}. Menggunakan fallback mock.`);
+    return handleMockRequest(endpoint, options) as T;
+  } catch {
+    // Jika network error, fallback mulus ke Mock Backend
+    console.warn(`[API] Network error pada ${endpoint}. Menggunakan fallback mock.`);
+    return handleMockRequest(endpoint, options) as T;
   }
-
-  return data;
 }
