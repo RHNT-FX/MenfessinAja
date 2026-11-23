@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { handle } from '@hono/node-server/vercel';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
@@ -27,12 +28,19 @@ app.use('*', cors({
 app.onError(errorHandler);
 
 // Route Registration (Sesuai SDD 1.2 & 6 Design Arsitektur)
-app.route('/api/health', healthRouter);
-app.route('/api/auth', authRouter);
-app.route('/api/posts', postsRouter);
-app.route('/api/transaction', transactionsRouter);
-app.route('/api/transactions', transactionsRouter);
-app.route('/api/admin', adminRouter);
+// Daftarkan baik dengan prefix /api maupun tanpa prefix
+// agar kompatibel di Vercel rewrites (apapun format URL yang diteruskan)
+const registerRoutes = (prefix: string) => {
+  app.route(`${prefix}/health`, healthRouter);
+  app.route(`${prefix}/auth`, authRouter);
+  app.route(`${prefix}/posts`, postsRouter);
+  app.route(`${prefix}/transaction`, transactionsRouter);
+  app.route(`${prefix}/transactions`, transactionsRouter);
+  app.route(`${prefix}/admin`, adminRouter);
+};
+
+registerRoutes('/api');
+registerRoutes('');
 
 // Fallback 404
 app.notFound((c) => {
@@ -51,4 +59,9 @@ if (!process.env.VERCEL) {
   });
 }
 
-export default app;
+// Handler kompatibel untuk Vercel Serverless Function & standard fetch
+const handler = handle(app);
+(handler as any).fetch = app.fetch;
+
+export { app };
+export default handler;
