@@ -16,8 +16,12 @@
       "destination": { "service": "server" }
     },
     {
-      "source": "/(.*)",
+      "source": "/assets/(.*)",
       "destination": { "service": "web" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "web", "path": "/index.html" }
     }
   ]
 }
