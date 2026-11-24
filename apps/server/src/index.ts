@@ -49,8 +49,14 @@ app.notFound((c) => {
   }, 404);
 });
 
-// Start Server (Hanya dijalankan jika bukan lingkungan serverless seperti Vercel)
-if (!process.env.VERCEL) {
+// Start Server (Hanya dijalankan jika dieksekusi langsung sebagai standalone Node, bukan serverless module)
+const isDirectRun = typeof process !== 'undefined' &&
+  !process.env.VERCEL &&
+  !process.env.AWS_REGION &&
+  !process.env.NOW_REGION &&
+  Boolean(process.argv?.[1]?.endsWith('index.ts') || process.argv?.[1]?.endsWith('index.js'));
+
+if (isDirectRun) {
   console.log(`🚀 [Menfessin Aja API] Menjalankan peladen Hono pada port ${ENV.PORT}...`);
   serve({
     fetch: app.fetch,
