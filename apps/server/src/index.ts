@@ -58,5 +58,12 @@ if (!process.env.VERCEL) {
   });
 }
 
+// Universal handler untuk Vercel Serverless Function (kompatibel fetch & handler)
+const handler = (req: any, ...args: any[]) => {
+  return app.fetch(req, ...args);
+};
+Object.assign(handler, app);
+handler.fetch = app.fetch.bind(app);
+
 export { app };
-export default app;
+export default handler;
