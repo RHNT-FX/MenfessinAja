@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { handle as nodeHandle } from '@hono/node-server/vercel';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
@@ -58,12 +59,15 @@ if (!process.env.VERCEL) {
   });
 }
 
-// Universal handler untuk Vercel Serverless Function (kompatibel fetch & handler)
-const handler = (req: any, ...args: any[]) => {
-  return app.fetch(req, ...args);
-};
-Object.assign(handler, app);
-handler.fetch = app.fetch.bind(app);
+const nodeHandler = nodeHandle(app);
 
+// Universal handler untuk Vercel Serverless Function (kompatibel req/res Node & standard fetch)
+export default function handler(req: any, res?: any) {
+  if (res && typeof res.setHeader === 'function') {
+    return nodeHandler(req, res);
+  }
+  return app.fetch(req, res);
+}
+
+handler.fetch = app.fetch.bind(app);
 export { app };
-export default handler;
