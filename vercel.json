@@ -3,9 +3,7 @@
   "services": {
     "server": {
       "root": "apps/server",
-      "runtime": "nodejs20.x",
-      "entrypoint": "dist/index.js",
-      "buildCommand": "npm run build"
+      "framework": "hono"
     },
     "web": {
       "root": "apps/web",

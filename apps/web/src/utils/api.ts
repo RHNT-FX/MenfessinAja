@@ -41,12 +41,24 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
       return data as T;
     }
 
-    // Jika status 500 atau 404 pada Vercel, fallback mulus ke Mock Backend
+    // Tangani penolakan eksplisit dari backend (400, 401, 403, 409, 422, dsb)
+    // Jangan disamarkan menjadi mock sukses bila server menolak autentikasi atau validasi!
+    if (response.status >= 400 && response.status < 500 && response.status !== 404) {
+      const errData = await response.json().catch(() => ({}));
+      const message = errData.message || `Permintaan gagal dengan status ${response.status}`;
+      throw new Error(message);
+    }
+
+    // Jika status 500 atau 404 pada Vercel/offline, fallback mulus ke Mock Backend
     console.warn(`[API] Server status ${response.status} pada ${endpoint}. Menggunakan fallback mock.`);
     return handleMockRequest(endpoint, options) as T;
-  } catch {
-    // Jika network error, fallback mulus ke Mock Backend
-    console.warn(`[API] Network error pada ${endpoint}. Menggunakan fallback mock.`);
+  } catch (err: any) {
+    // Jika error eksplisit dari penolakan server (4xx), lempar ke pemanggil (store / UI)
+    if (err instanceof Error && !err.message.toLowerCase().includes('failed to fetch') && !err.message.toLowerCase().includes('networkerror')) {
+      throw err;
+    }
+    // Jika network offline atau backend belum tersedia, fallback ke Mock Backend
+    console.warn(`[API] Network error pada ${endpoint}. Menggunakan fallback mock:`, err);
     return handleMockRequest(endpoint, options) as T;
   }
 }

@@ -36,6 +36,10 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(response.data.user, response.data.token);
         return response.data.user;
       } catch (err: any) {
+        // Jika penolakan dari server (misal password salah, status banned, format salah), lempar langsung ke UI
+        if (err instanceof Error && !err.message.toLowerCase().includes('failed to fetch') && !err.message.toLowerCase().includes('networkerror')) {
+          throw err;
+        }
         // Fallback demo account offline/resilient login
         const normalized = email.toLowerCase().trim();
         if (normalized === 'student@menfessinaja.ac.id' && password === 'password123') {
@@ -78,7 +82,11 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(response.data.user, response.data.token);
         return response.data.user;
       } catch (err: any) {
-        // Fallback register
+        // Jika server secara eksplisit menolak registrasi (email sudah terdaftar, invalid password, dll), lempar ke UI
+        if (err instanceof Error && !err.message.toLowerCase().includes('failed to fetch') && !err.message.toLowerCase().includes('networkerror')) {
+          throw err;
+        }
+        // Fallback register hanya jika offline
         const newUser: User = {
           id: 'user-' + Date.now(),
           email: email.toLowerCase().trim(),
