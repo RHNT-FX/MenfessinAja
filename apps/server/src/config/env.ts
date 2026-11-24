@@ -12,9 +12,9 @@ export const ENV = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
 
-  SUPABASE_URL: process.env.SUPABASE_URL || 'https://demo-placeholder.supabase.co',
-  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || 'demo-anon-key',
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'demo-service-key',
+  SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo-placeholder.supabase.co',
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo-anon-key',
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || 'demo-service-key',
   SUPABASE_STORAGE_BUCKET: process.env.SUPABASE_STORAGE_BUCKET || 'posts-media',
 
   JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-key-menfessin-aja-2026',

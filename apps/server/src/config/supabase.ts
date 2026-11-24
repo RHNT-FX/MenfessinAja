@@ -2,10 +2,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ENV } from './env.js';
 
 export const isSupabaseConfigured = Boolean(
+  process.env.NODE_ENV !== 'test' &&
+  !process.env.VITEST &&
   ENV.SUPABASE_URL && 
   !ENV.SUPABASE_URL.includes('your-project') &&
   !ENV.SUPABASE_URL.includes('demo-placeholder') &&
-  ENV.SUPABASE_ANON_KEY &&
+  (ENV.SUPABASE_ANON_KEY || ENV.SUPABASE_SERVICE_ROLE_KEY) &&
   !ENV.SUPABASE_ANON_KEY.includes('your-supabase') &&
   ENV.SUPABASE_ANON_KEY !== 'demo-anon-key'
 );
@@ -18,9 +20,13 @@ let _supabaseClient: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!_supabaseClient) {
+    const key = (ENV.SUPABASE_SERVICE_ROLE_KEY && ENV.SUPABASE_SERVICE_ROLE_KEY !== 'demo-service-key' && ENV.SUPABASE_SERVICE_ROLE_KEY.trim() !== '')
+      ? ENV.SUPABASE_SERVICE_ROLE_KEY
+      : ENV.SUPABASE_ANON_KEY;
+
     _supabaseClient = createClient(
       ENV.SUPABASE_URL,
-      ENV.SUPABASE_SERVICE_ROLE_KEY || ENV.SUPABASE_ANON_KEY,
+      key,
       {
         auth: { persistSession: false },
         realtime: {
