@@ -1,5 +1,4 @@
 import { serve } from '@hono/node-server';
-import { handle } from '@hono/node-server/vercel';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
@@ -59,9 +58,5 @@ if (!process.env.VERCEL) {
   });
 }
 
-// Handler kompatibel untuk Vercel Serverless Function & standard fetch
-const handler = handle(app);
-(handler as any).fetch = app.fetch;
-
 export { app };
-export default handler;
+export default app;
