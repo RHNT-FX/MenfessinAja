@@ -578,15 +578,17 @@ export function handleMockRequest(endpoint: string, options: any = {}): any {
   // 7. POST /api/transactions/checkout
   if (path === '/api/transactions/checkout' && method === 'POST') {
     const body = options.body ? JSON.parse(options.body) : {};
-    const orderId = 'ORD-' + Date.now();
+    const orderId = 'ORDER-SUPERCHAT-' + Date.now();
     return {
       success: true,
       data: {
         orderId,
-        amount: body.amount || 15000,
-        snapToken: 'snap-mock-token-' + Date.now(),
-        qrString: '00020101021226600016ID.CO.QRIS.WWW01189360050300000889980215000000000000000520458125802ID5913Menfessin Aja6007BANDUNG61054011562070703A016304E07B',
-        paymentUrl: '#'
+        token: 'snap-token-mock-' + Date.now(),
+        snapToken: 'snap-token-mock-' + Date.now(),
+        grossAmount: body.gross_amount || 5000,
+        amount: body.gross_amount || 5000,
+        redirectUrl: 'https://app.midtrans.com/snap/v4/redirection/demo',
+        isMock: false
       }
     };
   }

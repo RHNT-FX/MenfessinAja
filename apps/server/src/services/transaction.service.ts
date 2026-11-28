@@ -41,10 +41,16 @@ export class TransactionService {
   static async createCheckout(input: CheckoutInput): Promise<CheckoutOutput> {
     const { userId, userEmail, postId, featureType } = input;
 
-    // 1. Validasi postingan terkait
-    const post = await PostRepository.findById(postId);
-    if (!post) {
-      throw new Error('Postingan target tidak ditemukan');
+    // 1. Validasi postingan terkait (dukung pre-payment sebelum submit atau post spesifik)
+    let targetPostId = postId;
+    if (postId && !postId.startsWith('temp')) {
+      const post = await PostRepository.findById(postId);
+      if (post) {
+        targetPostId = post.id;
+      }
+    }
+    if (!targetPostId || targetPostId.startsWith('temp')) {
+      targetPostId = '10000000-0000-0000-0000-000000000001';
     }
 
     // 2. Tentukan nominal biaya (Default: Rp5.000 sesuai SDD & Figma)

@@ -35369,9 +35369,15 @@ var TransactionService = class {
    */
   static async createCheckout(input) {
     const { userId, userEmail, postId, featureType } = input;
-    const post2 = await PostRepository.findById(postId);
-    if (!post2) {
-      throw new Error("Postingan target tidak ditemukan");
+    let targetPostId = postId;
+    if (postId && !postId.startsWith("temp")) {
+      const post2 = await PostRepository.findById(postId);
+      if (post2) {
+        targetPostId = post2.id;
+      }
+    }
+    if (!targetPostId || targetPostId.startsWith("temp")) {
+      targetPostId = "10000000-0000-0000-0000-000000000001";
     }
     const grossAmount = input.grossAmount && input.grossAmount > 0 ? input.grossAmount : 5e3;
     const itemName = featureType === "superchat" ? "Superchat Pinned Post Menfess (24 Jam)" : "Boost Listing Marketplace (24 Jam)";

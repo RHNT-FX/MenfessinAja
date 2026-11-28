@@ -144,6 +144,81 @@ interface CheckoutState {
 
 const activeCheckout = ref<CheckoutState | null>(null);
 const isPaying = ref(false);
+const isOpeningQris = ref(false);
+
+async function openSuperchatQris() {
+  isSuperchatSelected.value = true;
+  isOpeningQris.value = true;
+  try {
+    let token = activeCheckout.value?.token;
+
+    if (!token) {
+      const checkoutRes = await apiFetch('/api/transactions/checkout', {
+        method: 'POST',
+        body: JSON.stringify({
+          post_id: '10000000-0000-0000-0000-000000000001',
+          feature_type: 'superchat',
+          gross_amount: 5000
+        })
+      });
+
+      if (checkoutRes && checkoutRes.data) {
+        token = checkoutRes.data.token || checkoutRes.data.snapToken;
+        activeCheckout.value = {
+          orderId: checkoutRes.data.orderId || ('ORDER-SUPERCHAT-' + Date.now()),
+          token: token || '',
+          redirectUrl: checkoutRes.data.redirectUrl || '#',
+          grossAmount: checkoutRes.data.grossAmount || 5000,
+          status: 'pending',
+          postId: '10000000-0000-0000-0000-000000000001'
+        };
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      if (!(window as any).snap) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://app.midtrans.com/snap/snap.js';
+          script.setAttribute('data-client-key', 'Mid-client-liqJ1AQJ0QVsffcR');
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      if ((window as any).snap && token) {
+        (window as any).snap.pay(token, {
+          onSuccess: () => {
+            if (activeCheckout.value) activeCheckout.value.status = 'settlement';
+            alert('Pembayaran Berhasil! Postingan Anda otomatis menjadi Superchat / Pinned.');
+          },
+          onPending: () => {
+            if (activeCheckout.value) activeCheckout.value.status = 'pending';
+          },
+          onError: (err: any) => {
+            console.warn('[Midtrans] Error payment:', err);
+          },
+          onClose: () => {
+            console.log('[Midtrans] Pop-up ditutup oleh pengguna');
+          }
+        });
+      }
+    }
+  } catch (err: any) {
+    console.error('Gagal membuka Midtrans Snap:', err);
+    alert('Gagal memuat Snap QRIS: ' + (err.message || 'Koneksi error'));
+  } finally {
+    isOpeningQris.value = false;
+  }
+}
+
+async function handleToggleSuperchat() {
+  isSuperchatSelected.value = !isSuperchatSelected.value;
+  if (isSuperchatSelected.value) {
+    await openSuperchatQris();
+  }
+}
 
 async function handleSimulatePayment() {
   if (!activeCheckout.value) return;
@@ -856,21 +931,45 @@ function formatRelativeTime(dateStr?: string): string {
             </div>
 
             <!-- Toggle Superchat Option -->
-            <div
-              @click="isSuperchatSelected = !isSuperchatSelected"
-              class="p-3.5 bg-primary-soft border border-primary/20 rounded-sm cursor-pointer hover:border-primary transition-all flex items-start gap-3"
+            <label
+              class="p-3.5 bg-primary-soft border border-primary/30 rounded-sm cursor-pointer hover:border-primary transition-all flex items-start gap-3 select-none"
             >
-              <Sparkles class="w-4 h-4 text-primary shrink-0 mt-0.5" />
-              <div class="text-xs">
-                <div class="font-bold text-primary flex items-center gap-2">
-                  <span>Pakai Superchat / Pinned Post</span>
-                  <span v-if="isSuperchatSelected" class="text-[10px] bg-primary text-white px-1.5 py-0.2 rounded-xs">Aktif</span>
+              <input
+                type="checkbox"
+                :checked="isSuperchatSelected"
+                @change="handleToggleSuperchat"
+                class="accent-primary mt-1 w-4 h-4 cursor-pointer"
+              />
+              <div class="text-xs flex-1">
+                <div class="font-bold text-primary flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <Sparkles class="w-3.5 h-3.5" />
+                    Pakai Superchat / Pinned Post (Rp5.000)
+                  </span>
+                  <span
+                    v-if="isOpeningQris"
+                    class="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-xs flex items-center gap-1 font-bold"
+                  >
+                    <Loader2 class="w-3 h-3 animate-spin" /> Membuka Snap...
+                  </span>
+                  <span
+                    v-else-if="activeCheckout?.status === 'settlement'"
+                    class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-xs font-bold"
+                  >
+                    ✓ LUNAS
+                  </span>
+                  <span
+                    v-else-if="isSuperchatSelected"
+                    class="text-[10px] bg-primary text-white px-2 py-0.5 rounded-xs font-bold"
+                  >
+                    QRIS Aktif
+                  </span>
                 </div>
                 <div class="text-ink-muted text-[11px] mt-0.5 leading-normal">
-                  Contoh Rp5.000 / 24 jam. Disematkan di urutan teratas feed linimasa.
+                  Disematkan di urutan teratas feed 24 jam. <b>Centang untuk langsung memunculkan pop-up QRIS Midtrans</b>.
                 </div>
               </div>
-            </div>
+            </label>
 
             <!-- Cloudflare Turnstile Verification Widget -->
             <TurnstileWidget v-model="turnstileToken" />
@@ -977,18 +1076,32 @@ function formatRelativeTime(dateStr?: string): string {
                 </div>
               </div>
 
+              <!-- Tombol Buka Pop-up QRIS Midtrans Langsung -->
+              <div class="mt-3">
+                <button
+                  type="button"
+                  @click="openSuperchatQris"
+                  :disabled="isOpeningQris"
+                  class="w-full py-2.5 bg-primary hover:bg-primary-hover active:scale-[0.99] text-white font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 mb-2"
+                >
+                  <Loader2 v-if="isOpeningQris" class="w-3.5 h-3.5 animate-spin" />
+                  <QrCode v-else class="w-3.5 h-3.5" />
+                  <span>{{ isOpeningQris ? 'Menghubungkan Midtrans...' : '⚡ Buka Pop-up QRIS Midtrans' }}</span>
+                </button>
+              </div>
+
               <!-- Tombol Simulasi Bayar Offline / Live Presentation -->
-              <div v-if="activeCheckout && activeCheckout.status === 'pending'" class="mt-3">
+              <div v-if="activeCheckout && activeCheckout.status === 'pending'">
                 <button
                   type="button"
                   @click="handleSimulatePayment"
                   :disabled="isPaying"
-                  class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                  class="w-full py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                   title="Simulasikan pembayaran QRIS sukses untuk demo presentasi"
                 >
                   <Loader2 v-if="isPaying" class="w-3.5 h-3.5 animate-spin" />
                   <Zap v-else class="w-3.5 h-3.5" />
-                  <span>{{ isPaying ? 'Memproses Webhook...' : '⚡ Simulasikan Bayar QRIS Sukses' }}</span>
+                  <span>{{ isPaying ? 'Memproses Webhook...' : 'Simulasikan Bayar Lunas Langsung' }}</span>
                 </button>
               </div>
 
