@@ -203,12 +203,47 @@ async function handleCreateProduct() {
       products.value.unshift(newItem);
       selectedProduct.value = newItem;
       isCreateOpen.value = false;
+
+      // Jika memilih Boost Listing, munculkan pop-up Snap QRIS Midtrans
+      if (isBoostedSelected.value && res.data?.id) {
+        try {
+          const checkoutRes = await apiFetch('/api/transactions/checkout', {
+            method: 'POST',
+            body: JSON.stringify({
+              post_id: res.data.id,
+              feature_type: 'boost_listing',
+              gross_amount: 5000
+            })
+          });
+
+          if (checkoutRes.success && checkoutRes.data?.token) {
+            if (typeof window !== 'undefined' && (window as any).snap && !checkoutRes.data.isMock) {
+              (window as any).snap.pay(checkoutRes.data.token, {
+                onSuccess: () => {
+                  newItem.is_boosted = true;
+                  alert('Pembayaran Boost Listing berhasil! Barang Anda disematkan di posisi teratas.');
+                },
+                onPending: () => {
+                  alert('Menunggu pembayaran QRIS selesai...');
+                },
+                onError: () => {
+                  alert('Pembayaran QRIS dibatalkan atau gagal.');
+                }
+              });
+            }
+          }
+        } catch (checkoutErr: any) {
+          console.warn('[Marketplace] Boost checkout notice:', checkoutErr);
+        }
+      }
+
       // Reset form
       formTitle.value = '';
       formPrice.value = '';
       formDesc.value = '';
       formLocation.value = '';
       formWa.value = '';
+      isBoostedSelected.value = false;
       removeImage();
     }
   } catch (err: any) {
